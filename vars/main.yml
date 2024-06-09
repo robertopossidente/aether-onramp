@@ -31,7 +31,7 @@ gnbsim:
     container:
       image: omecproject/5gc-gnbsim:rel-1.4.3
       prefix: gnbsim
-      count: 1
+      count: 2
     network:
       macvlan:
         name: gnbnet
