@@ -1,7 +1,8 @@
 #### Variables ####
 
-export ROOT_DIR ?= $(PWD)
-export AETHER_ROOT_DIR ?= $(ROOT_DIR)
+MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+export ROOT_DIR := $(or $(ROOT_DIR),$(MAKEFILE_DIR:/=))
+export AETHER_ROOT_DIR := $(or $(AETHER_ROOT_DIR),$(ROOT_DIR))
 
 export SDRAN_ROOT_DIR ?= $(AETHER_ROOT_DIR)/deps/sdran
 export 5GC_ROOT_DIR ?= $(AETHER_ROOT_DIR)/deps/5gc
