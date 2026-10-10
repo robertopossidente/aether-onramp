@@ -3,6 +3,12 @@ core:
   data_iface: ""
   values_file: "roles/core/templates/sdcore-5g-values.yaml"
   ran_subnet: "" # set it to empty to get subnet from 'data_iface'
+  webui:
+    service_type: ClusterIP
+    node_ports:
+      metrics: 30808
+      http: 30500
+      rest: 30501
 
   helm:
     local_charts: false

@@ -23,6 +23,10 @@ export HOSTS_INI_FILE ?= $(AETHER_ROOT_DIR)/hosts.ini
 
 export EXTRA_VARS ?= "@$(AETHER_ROOT_DIR)/vars/main.yml"
 
+export KUBECTL ?= kubectl
+export KUBE_NAMESPACE ?= aether-5gc
+export WEBUI_SERVICE ?= webui
+
 
 #### Validate Ansible Configuration ####
 aether-pingall:
@@ -77,6 +81,10 @@ aether-add-upfs: 5gc-upf-install
 aether-remove-upfs: 5gc-upf-uninstall
 aether-ueransim-run: ueransim-run
 aether-ueransim-stop: ueransim-stop
+
+#### Access WebUI locally without exposing the Service ####
+webui-port-forward:
+	$(KUBECTL) -n $(KUBE_NAMESPACE) port-forward svc/$(WEBUI_SERVICE) 5000:5000 5001:5001 8080:8080
 
 # Rules:
 #	amp-install: amp-monitor-install amp-monitor-load

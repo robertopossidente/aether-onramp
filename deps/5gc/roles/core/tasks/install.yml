@@ -451,3 +451,38 @@
       when:
         - inventory_hostname in groups['master_nodes']
         - (pod_still_not_ready_names | default([]) | length) > 0
+
+- name: expose WebUI through configured NodePorts
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - -n
+      - aether-5gc
+      - patch
+      - service/webui
+      - --type=merge
+      - -p
+      - >-
+        {{ {'spec': {'type': 'NodePort', 'ports': [
+        {'name': 'prometheus-exporter', 'port': 8080, 'targetPort': 8080, 'protocol': 'TCP', 'nodePort': core.webui.node_ports.metrics | int},
+        {'name': 'urlport-http', 'port': 5000, 'targetPort': 5000, 'protocol': 'TCP', 'nodePort': core.webui.node_ports.http | int},
+        {'name': 'rest', 'port': 5001, 'targetPort': 5001, 'protocol': 'TCP', 'nodePort': core.webui.node_ports.rest | int}]}} | to_json }}
+  register: webui_nodeport_patch
+  changed_when: webui_nodeport_patch.stdout is search('"type":"NodePort"')
+  when:
+    - inventory_hostname in groups['master_nodes']
+    - core.webui.service_type == 'NodePort'
+
+- name: keep WebUI internal when configured as ClusterIP
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Service
+    namespace: aether-5gc
+    name: webui
+    state: present
+    definition:
+      spec:
+        type: ClusterIP
+  when:
+    - inventory_hostname in groups['master_nodes']
+    - core.webui.service_type == 'ClusterIP'

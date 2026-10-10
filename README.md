@@ -88,6 +88,28 @@ you are ready to install the 5G version of SD-Core. Type:
 $ make aether-5gc-install
 ```
 
+### Accessing the 5GC WebUI
+
+The WebUI is exposed through `NodePort` on the configured Kubernetes node:
+
+```text
+http://<node-ip>:30500  WebUI
+http://<node-ip>:30501  REST API
+http://<node-ip>:30808  metrics
+```
+
+With the default single-node configuration, use `http://172.30.255.119:30500`.
+The corresponding service ports are 5000, 5001, and 8080. The NodePort values
+are configured in `vars/main.yml` and reapplied by the 5GC core installation.
+
+The WebUI configuration currently has authentication disabled. Restrict these
+ports with the node firewall or a trusted network before using this exposure
+outside a protected environment. For local-only access instead, use:
+
+```bash
+kubectl -n aether-5gc port-forward svc/webui 5000:5000 5001:5001 8080:8080
+```
+
 Once the Core is running (which you can verify by using ``kubectl`` to
 check the ``omec`` name space), you are ready to emulate a RAN
 workload. Type:

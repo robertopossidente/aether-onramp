@@ -41,6 +41,12 @@ core:
       ue_ip_pool: "192.168.100.0/24"
   amf:
     ip: "172.30.255.119"
+  webui:
+    service_type: NodePort
+    node_ports:
+      metrics: 30808
+      http: 30500
+      rest: 30501
 
 ocudu:
   docker:
