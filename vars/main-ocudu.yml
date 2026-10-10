@@ -22,7 +22,7 @@ k8s:
     version: v3.20.0
 
 core:
-  data_iface: ens18
+  data_iface: eth0
   values_file: "deps/5gc/roles/core/templates/sdcore-5g-values.yaml"
   ran_subnet: ""    # set to empty string to get subnet from 'data_iface'
   helm:
@@ -40,7 +40,13 @@ core:
         core:   "192.168.250.3"
       ue_ip_pool: "192.168.100.0/24"
   amf:
-    ip: "10.76.28.113"
+    ip: "172.30.255.119"
+  webui:
+    service_type: NodePort
+    node_ports:
+      metrics: 30808
+      http: 30500
+      rest: 30501
 
 ocudu:
   docker:
@@ -52,7 +58,7 @@ ocudu:
   simulation: true
   servers:
     0:
-      gnb_ip: "10.76.28.115"             # Host interface used for the gNB
+      gnb_ip: "172.30.255.119"           # Host interface used for the gNB
       gnb_conf: gnb_zmq.yaml             # deps/ocudu/roles/gNB/templates/; use gnb_dpdk_benetel.yaml for DPDK+OFH
       ue_conf: ue_zmq.conf               # deps/ocudu/roles/uEsimulator/templates/
       dpdk:
