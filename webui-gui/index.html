@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Aether SD-Core WebUI</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; display: flex; height: 100vh; }
+  nav { width: 200px; background: #1f2a37; color: #fff; padding: 12px; }
+  nav button { display: block; width: 100%; margin: 4px 0; padding: 8px; text-align: left;
+               background: #374151; color: #fff; border: 0; border-radius: 4px; cursor: pointer; }
+  nav button.active { background: #2563eb; }
+  #list { width: 300px; overflow: auto; border-right: 1px solid #ddd; padding: 8px; }
+  #list input { width: 100%; box-sizing: border-box; margin-bottom: 6px; padding: 6px; }
+  #list div.item { padding: 5px 6px; cursor: pointer; font-size: 13px; word-break: break-all; }
+  #list div.item:hover, #list div.item.sel { background: #e5edff; }
+  main { flex: 1; padding: 12px; display: flex; flex-direction: column; min-width: 0; }
+  textarea { flex: 1; font-family: monospace; font-size: 13px; }
+  .bar { margin: 8px 0; display: flex; gap: 8px; align-items: center; }
+  #msg { font-size: 13px; }
+  .err { color: #b91c1c; } .ok { color: #15803d; }
+</style>
+</head>
+<body>
+<nav>
+  <h3>SD-Core</h3>
+  <button data-kind="network-slice" class="active">Network slices</button>
+  <button data-kind="device-group">Device groups</button>
+  <button data-kind="subscriber">Assinantes</button>
+  <button data-kind="gnb">gNBs</button>
+  <button data-kind="upf">UPFs</button>
+</nav>
+<section id="list">
+  <input id="filter" placeholder="filtrar...">
+  <div id="items"></div>
+</section>
+<main>
+  <div class="bar">
+    <b id="title">Selecione um item</b>
+    <button id="new">Novo</button>
+    <button id="save">Salvar</button>
+    <button id="del">Excluir</button>
+    <span id="msg"></span>
+  </div>
+  <textarea id="editor" spellcheck="false"></textarea>
+</main>
+<script>
+const KINDS = {
+  "network-slice": { list: "/config/v1/network-slice", item: n => `/config/v1/network-slice/${n}`, name: x => x },
+  "device-group":  { list: "/config/v1/device-group",  item: n => `/config/v1/device-group/${n}`,  name: x => x },
+  "subscriber":    { list: "/api/subscriber", item: n => `/api/subscriber/${n}`, name: x => x.ueId },
+  "gnb": { derived: true, inventory: "/config/v1/inventory/gnb", name: x => x.name || x.gnbName },
+  "upf": { derived: true, inventory: "/config/v1/inventory/upf", name: x => x.hostname || x.name },
+};
+let derivedItems = {};
+
+// gNBs/UPFs vêm do inventário e do site-info dos slices (o inventário costuma ficar vazio)
+async function loadDerived() {
+  const out = {};
+  const inv = JSON.parse(await api("GET", KINDS[kind].inventory));
+  inv.forEach(x => { out[KINDS[kind].name(x)] = { source: "inventory", ...x }; });
+  const slices = JSON.parse(await api("GET", "/config/v1/network-slice"));
+  for (const sl of slices) {
+    const d = JSON.parse(await api("GET", `/config/v1/network-slice/${sl}`));
+    const site = d["site-info"] || {};
+    if (kind === "gnb") (site.gNodeBs || []).forEach(g => {
+      out[g.name] = { source: `slice:${sl}`, site: site["site-name"], plmn: site.plmn, ...g, ...(out[g.name] || {}) };
+    });
+    else if (site.upf) out[site.upf["upf-name"]] = {
+      source: `slice:${sl}`, site: site["site-name"], ...site.upf, ...(out[site.upf["upf-name"]] || {}),
+    };
+  }
+  return out;
+}
+
+function setReadOnlyView() {
+  const hide = serverReadOnly || !!KINDS[kind].derived;
+  ["new", "save", "del"].forEach(i => $(i).style.visibility = hide ? "hidden" : "visible");
+}
+let kind = "network-slice", current = null, serverReadOnly = false;
+const $ = id => document.getElementById(id);
+
+function msg(text, ok) { $("msg").textContent = text; $("msg").className = ok ? "ok" : "err"; }
+
+async function api(method, path, body) {
+  const r = await fetch("/proxy" + path, {
+    method, body: body === undefined ? undefined : body,
+    headers: body === undefined ? {} : { "Content-Type": "application/json" },
+  });
+  const text = await r.text();
+  if (!r.ok) throw new Error(`${r.status}: ${text}`);
+  return text;
+}
+
+async function loadList() {
+  $("items").textContent = "carregando...";
+  try {
+    let names;
+    if (KINDS[kind].derived) {
+      derivedItems = await loadDerived();
+      names = Object.keys(derivedItems).sort();
+      if (!names.length) msg("nenhum item encontrado");
+    } else {
+      names = JSON.parse(await api("GET", KINDS[kind].list)).map(KINDS[kind].name).sort();
+    }
+    $("items").innerHTML = "";
+    names.forEach(n => {
+      const d = document.createElement("div");
+      d.className = "item"; d.textContent = n;
+      d.onclick = () => select(n, d);
+      $("items").appendChild(d);
+    });
+    applyFilter();
+  } catch (e) { $("items").textContent = ""; msg(e.message); }
+}
+
+function applyFilter() {
+  const f = $("filter").value.toLowerCase();
+  [...$("items").children].forEach(d => d.style.display = d.textContent.toLowerCase().includes(f) ? "" : "none");
+}
+
+async function select(name, el) {
+  [...$("items").children].forEach(d => d.classList.remove("sel"));
+  if (el) el.classList.add("sel");
+  current = name; $("title").textContent = `${kind}: ${name}`;
+  try {
+    $("editor").value = KINDS[kind].derived
+      ? JSON.stringify(derivedItems[name], null, 2)
+      : JSON.stringify(JSON.parse(await api("GET", KINDS[kind].item(name))), null, 2);
+    msg("");
+  } catch (e) { msg(e.message); }
+}
+
+$("new").onclick = () => {
+  const name = prompt("Nome/ID do novo item:");
+  if (!name) return;
+  current = name; $("title").textContent = `${kind}: ${name} (novo)`;
+  $("editor").value = "{}";
+};
+
+$("save").onclick = async () => {
+  if (!current) return;
+  try {
+    JSON.parse($("editor").value);
+    await api("POST", KINDS[kind].item(current), $("editor").value);
+    msg("salvo", true); loadList();
+  } catch (e) { msg(e.message); }
+};
+
+$("del").onclick = async () => {
+  if (!current || !confirm(`Excluir ${current}?`)) return;
+  try {
+    await api("DELETE", KINDS[kind].item(current));
+    msg("excluído", true); current = null; $("editor").value = ""; loadList();
+  } catch (e) { msg(e.message); }
+};
+
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach(x => x.classList.remove("active"));
+  b.classList.add("active"); kind = b.dataset.kind; current = null;
+  $("editor").value = ""; $("title").textContent = "Selecione um item"; msg(""); setReadOnlyView(); loadList();
+});
+$("filter").oninput = applyFilter;
+
+fetch("/gui/config").then(r => r.json()).then(c => {
+  serverReadOnly = c.readOnly; setReadOnlyView();
+});
+loadList();
+</script>
+</body>
+</html>
