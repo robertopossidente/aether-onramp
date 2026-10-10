@@ -52,7 +52,7 @@ ocudu:
   simulation: true
   servers:
     0:
-      gnb_ip: "10.76.28.115"             # Host interface used for the gNB
+      gnb_ip: "172.30.255.119"           # Host interface used for the gNB
       gnb_conf: gnb_zmq.yaml             # deps/ocudu/roles/gNB/templates/; use gnb_dpdk_benetel.yaml for DPDK+OFH
       ue_conf: ue_zmq.conf               # deps/ocudu/roles/uEsimulator/templates/
       dpdk:
