@@ -16,6 +16,7 @@
   main { flex: 1; padding: 12px; display: flex; flex-direction: column; min-width: 0; }
   textarea { flex: 1; font-family: monospace; font-size: 13px; }
   .bar { margin: 8px 0; display: flex; gap: 8px; align-items: center; }
+  .docs-link { margin-left: auto; }
   #msg { font-size: 13px; }
   .err { color: #b91c1c; } .ok { color: #15803d; }
 </style>
@@ -39,6 +40,7 @@
     <button id="new">Novo</button>
     <button id="save">Salvar</button>
     <button id="del">Excluir</button>
+    <a class="docs-link" href="/docs" target="_blank" rel="noopener">API Swagger</a>
     <span id="msg"></span>
   </div>
   <textarea id="editor" spellcheck="false"></textarea>

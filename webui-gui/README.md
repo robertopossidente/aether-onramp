@@ -13,6 +13,13 @@ docker run -d --name aether-webui-gui --restart unless-stopped -p 8088:8088 \
 
 Abra `http://<host>:8088/`.
 
+Documentação interativa da API: `http://<host>:8088/docs`. O documento
+OpenAPI fica disponível em `http://<host>:8088/openapi.json`; o botão
+**API Swagger** na GUI abre o Swagger UI. A interface Swagger carrega
+seus recursos estáticos do unpkg, então o navegador precisa ter acesso a
+`unpkg.com`. As operações são encaminhadas pelo proxy da GUI e respeitam
+`GUI_USER`/`GUI_PASSWORD` e `READ_ONLY`.
+
 | Variável | Padrão | Função |
 |---|---|---|
 | `WEBUI_URL` | `http://172.30.255.119:30500` | NodePort `urlport-http` do WebUI |
