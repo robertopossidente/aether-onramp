@@ -90,7 +90,7 @@
         (
           result.stdout_lines
           | default([])
-          | select('search', ' proto kernel ')
+          | select('search', '^[0-9]+(\.[0-9]+){3}/[0-9]+ .*proto kernel ')
           | map('regex_search', '^[^ ]+')
           | list
           | first

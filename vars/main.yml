@@ -24,7 +24,7 @@ k8s:
 core:
   data_iface: eth0
   values_file: "deps/5gc/roles/core/templates/sdcore-5g-values.yaml"
-  ran_subnet: "172.20.0.0/16"    # set to empty string to get subnet from 'data_iface'
+  ran_subnet: ""    # set to empty string to get subnet from 'data_iface'
   helm:
     local_charts: false      # set chart_ref to local path name if true
     chart_ref: oci://ghcr.io/omec-project/sd-core
@@ -42,24 +42,27 @@ core:
   amf:
     ip: "172.30.255.119"
 
-gnbsim:
+ocudu:
   docker:
     container:
-      image: ghcr.io/omec-project/5gc-gnbsim:rel-2.3.2
-      prefix: gnbsim
-      count: 1
+      gnb_image: aetherproject/ocudu:rel-1.0.0
+      ue_image: aetherproject/srsran-ue:rel-1.0.0
     network:
-      macvlan:
-        name: gnbnet
-
-  router:
-    data_iface: eth0
-    macvlan:
-      subnet_prefix: "172.20"
-
+      name: host
+  simulation: true
   servers:
     0:
-      - "deps/gnbsim/config/gnbsim-default.yaml"
+      gnb_ip: "10.76.28.115"             # Host interface used for the gNB
+      gnb_conf: gnb_zmq.yaml             # deps/ocudu/roles/gNB/templates/; use gnb_dpdk_benetel.yaml for DPDK+OFH
+      ue_conf: ue_zmq.conf               # deps/ocudu/roles/uEsimulator/templates/
+      dpdk:
+        enabled: false                   # set true to enable DPDK fronthaul (Benetel O-RU) on this OCUDU node
+        hugepages: 2                     # number of 1 GB hugepages to pre-allocate on this host
+        pf_iface: "enp81s0f3np3"         # Fronthaul PF interface used to create VF 0 on the OCUDU host
+        vf_bdf: "0000:51:19.0"
+        du_mac_addr: "00:33:22:33:00:11"
+        ru_mac_addr: "70:b3:d5:e1:5e:7e" # Benetel RU fronthaul port MAC
+        isolated_cpus: "3-15"            # CPU range to isolate for DPDK
 
 amp:
   monitor_dashboard: "deps/amp/roles/monitor-load/templates/5g-monitoring"
