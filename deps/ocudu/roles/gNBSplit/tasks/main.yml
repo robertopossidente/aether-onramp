@@ -1,0 +1,9 @@
+---
+
+- name: start ocudu CU/DU split
+  import_tasks: start.yml
+  tags: start
+
+- name: stop ocudu CU/DU split
+  import_tasks: stop.yml
+  tags: stop

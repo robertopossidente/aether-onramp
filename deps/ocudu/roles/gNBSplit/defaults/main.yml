@@ -1,0 +1,7 @@
+ocudu:
+  docker:
+    container:
+      gnb_image: aetherproject/ocudu:rel-1.0.0
+    network:
+      name: host
+  simulation: true

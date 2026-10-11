@@ -1,0 +1,28 @@
+cu_cp:
+  amf:
+    addrs: "{{ core.amf.ip }}"
+    bind_addrs: "{{ gnb_ip }}"
+    supported_tracking_areas:
+      - tac: 1
+        plmn_list:
+          - plmn: "00101"
+            tai_slice_support_list:
+              - sst: 1
+  inactivity_timer: 7200
+  # The SD-Core needs more than the 3 s default to answer the PDU session request
+  request_pdu_session_timeout: {{ request_pdu_session_timeout }}
+  f1ap:
+    bind_addrs: "{{ cu_f1_addr }}"
+
+cu_up:
+  f1u:
+    socket:
+      - bind_addr: "{{ cu_f1_addr }}"
+
+log:
+  filename: stdout
+  all_level: info
+
+pcap:
+  ngap_enable: false
+  f1ap_enable: false

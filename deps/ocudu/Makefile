@@ -42,6 +42,13 @@ ocudu-gnb-stop:
 	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/gNB.yml --tags stop \
 		--extra-vars $(EXTRA_VARS)
 
+ocudu-split-start:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/gNBSplit.yml --tags start \
+		--extra-vars $(EXTRA_VARS)
+ocudu-split-stop:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/gNBSplit.yml --tags stop \
+		--extra-vars $(EXTRA_VARS)
+
 ocudu-uesim-start:
 	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/uEsimulator.yml --tags start \
 		--extra-vars $(EXTRA_VARS)

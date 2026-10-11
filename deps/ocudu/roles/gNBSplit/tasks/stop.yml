@@ -1,0 +1,25 @@
+---
+
+- name: delete ocudu-du container
+  community.docker.docker_container:
+    name: ocudu-du
+    state: absent
+  when: inventory_hostname in groups['ocudu_nodes']
+  become: true
+
+- name: delete ocudu-cu container
+  community.docker.docker_container:
+    name: ocudu-cu
+    state: absent
+  when: inventory_hostname in groups['ocudu_nodes']
+  become: true
+
+- name: remove split configs
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/ocudu_cu.yaml
+    - /tmp/ocudu_du.yaml
+  when: inventory_hostname in groups['ocudu_nodes']
+  become: true

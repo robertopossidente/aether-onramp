@@ -1,0 +1,13 @@
+---
+
+- name: provision split OCUDU gNB (O-CU + O-DU over F1)
+  hosts: ocudu_nodes
+  gather_facts: true
+
+  vars_files:
+    - "vars/main.yml"
+
+  environment: "{{ proxy_env }}"
+
+  roles:
+    - gNBSplit

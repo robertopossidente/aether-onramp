@@ -1,0 +1,124 @@
+---
+
+- name: check if servers and config server length are equal
+  fail:
+    msg: "Mismatch in number of servers and ocudu nodes: {{ ocudu.servers|length }} vs {{ groups['ocudu_nodes']|length }}"
+  when: ocudu.servers|length != groups['ocudu_nodes']|length
+
+- name: split mode requires ZMQ simulation
+  fail:
+    msg: "The CU/DU split profile only supports the ZMQ simulated radio (ocudu.simulation: true)"
+  when: not (ocudu.simulation | bool)
+
+- name: check for a running monolithic gNB
+  community.docker.docker_container_info:
+    name: ocudu-gnb
+  register: monolithic_gnb
+  when: inventory_hostname in groups['ocudu_nodes']
+  become: true
+
+- name: refuse to start split gNB while the monolithic gNB is running
+  fail:
+    msg: "Container ocudu-gnb is running and shares the AMF identity and ZMQ ports; run 'make aether-ocudu-gnb-uninstall' or 'make ocudu-gnb-stop' first"
+  when:
+    - inventory_hostname in groups['ocudu_nodes']
+    - monolithic_gnb.container is defined
+    - monolithic_gnb.container.State.Running | default(false)
+
+- name: set net.core.wmem_max to 24912805
+  ansible.posix.sysctl:
+    name: net.core.wmem_max
+    value: '24912805'
+    sysctl_set: true
+    reload: true
+  when: inventory_hostname in groups['ocudu_nodes']
+  become: true
+
+- name: set net.core.rmem_max to 24912805
+  ansible.posix.sysctl:
+    name: net.core.rmem_max
+    value: '24912805'
+    sysctl_set: true
+    reload: true
+  when: inventory_hostname in groups['ocudu_nodes']
+  become: true
+
+- name: ensure {{ ocudu.docker.container.gnb_image }} image is present
+  community.docker.docker_image:
+    name: "{{ ocudu.docker.container.gnb_image }}"
+    source: "{{ 'local' if airgapped.enabled | default(false) | bool else 'pull' }}"
+  when: inventory_hostname in groups['ocudu_nodes']
+  become: true
+
+- name: resolve per-host OCUDU split settings
+  ansible.builtin.set_fact:
+    server_index: "{{ groups['ocudu_nodes'].index(inventory_hostname) }}"
+  when: inventory_hostname in groups['ocudu_nodes']
+
+- name: copy CU config to /tmp/ocudu_cu.yaml
+  template:
+    src: "{{ ocudu.servers[server_index | int].cu_conf | default('cu_f1.yaml') }}"
+    dest: /tmp/ocudu_cu.yaml
+  vars:
+    gnb_ip: "{{ ocudu.servers[server_index | int].gnb_ip }}"
+    f1: "{{ ocudu.servers[server_index | int].f1 | default({}) }}"
+    cu_f1_addr: "{{ (ocudu.servers[server_index | int].f1 | default({})).cu_addr | default('127.0.10.1') }}"
+    request_pdu_session_timeout: "{{ (ocudu.servers[server_index | int].f1 | default({})).request_pdu_session_timeout | default(15) }}"
+  when: inventory_hostname in groups['ocudu_nodes']
+  become: true
+
+- name: copy DU config to /tmp/ocudu_du.yaml
+  template:
+    src: "{{ ocudu.servers[server_index | int].du_conf | default('du_f1_zmq.yaml') }}"
+    dest: /tmp/ocudu_du.yaml
+  vars:
+    cu_f1_addr: "{{ (ocudu.servers[server_index | int].f1 | default({})).cu_addr | default('127.0.10.1') }}"
+    du_f1_addr: "{{ (ocudu.servers[server_index | int].f1 | default({})).du_addr | default('127.0.10.2') }}"
+  when: inventory_hostname in groups['ocudu_nodes']
+  become: true
+
+- name: create ocudu-cu container
+  community.docker.docker_container:
+    name: ocudu-cu
+    image: "{{ ocudu.docker.container.gnb_image }}"
+    networks:
+      - name: "{{ ocudu.docker.network.name }}"
+    volumes:
+      - /tmp/ocudu_cu.yaml:/opt/cu_config.yaml
+    capabilities:
+      - SYS_NICE
+      - IPC_LOCK
+    privileged: true
+    restart_policy: unless-stopped
+    state: started
+    detach: true
+    interactive: false
+    tty: false
+    command: "ocu -c /opt/cu_config.yaml"
+  when: inventory_hostname in groups['ocudu_nodes']
+  become: true
+
+- name: pause so the CU listens on F1-C before the DU connects
+  pause:
+    seconds: 5
+
+- name: create ocudu-du container
+  community.docker.docker_container:
+    name: ocudu-du
+    image: "{{ ocudu.docker.container.gnb_image }}"
+    networks:
+      - name: "{{ ocudu.docker.network.name }}"
+    volumes:
+      - /tmp/ocudu_du.yaml:/opt/du_config.yaml
+    capabilities:
+      - SYS_NICE
+      - IPC_LOCK
+    privileged: true
+    restart_policy: unless-stopped
+    state: started
+    detach: true
+    interactive: false
+    tty: false
+    command: "odu -c /opt/du_config.yaml"
+  when: inventory_hostname in groups['ocudu_nodes']
+  become: true

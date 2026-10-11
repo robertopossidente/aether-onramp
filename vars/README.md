@@ -54,6 +54,12 @@ blueprints include:
   emulated or simulated UE workload via the bundled srsRAN UE container.
   [here](https://docs.aetherproject.org/onramp/blueprints.html#ocudu).
 
+* `main-ocudu-split.yml`: Same as `main-ocudu.yml` but the gNB is split into
+  O-CU and O-DU containers connected over F1 (ZMQ radio, simulated UE). It is
+  mutually exclusive with the monolithic gNB: stop one before starting the
+  other. Use `cp vars/main-ocudu-split.yml vars/main.yml` or pass
+  `EXTRA_VARS='"@vars/main-ocudu-split.yml"'`.
+
 * `main-n3iwf.yml`: Configures the SD-Core with a N3IWF entity for non-3GPP access.
   Details documented
   [here](https://docs.aetherproject.org/onramp/blueprints.html#non-3gpp-interworking-function).

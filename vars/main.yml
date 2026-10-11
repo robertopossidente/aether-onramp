@@ -1,3 +1,5 @@
+# OCUDU split profile (O-CU + O-DU over F1, ZMQ radio, simulated UE).
+# Use with: make aether-ocudu-split-start / aether-ocudu-uesim-start. Do not run together with the monolithic gNB (main-ocudu.yml).
 proxy:
   enabled: false
   http_proxy: ""
@@ -60,7 +62,13 @@ ocudu:
     0:
       gnb_ip: "172.30.255.119"           # Host interface used for the gNB
       gnb_conf: gnb_zmq.yaml             # deps/ocudu/roles/gNB/templates/; use gnb_dpdk_benetel.yaml for DPDK+OFH
-      ue_conf: ue_zmq.conf               # deps/ocudu/roles/uEsimulator/templates/
+      ue_conf: ue_zmq_split.conf         # deps/ocudu/roles/uEsimulator/templates/; 10 MHz UE matching the split DU cell
+      cu_conf: cu_f1.yaml                # deps/ocudu/roles/gNBSplit/templates/
+      du_conf: du_f1_zmq.yaml            # deps/ocudu/roles/gNBSplit/templates/
+      f1:
+        cu_addr: "127.0.10.1"
+        du_addr: "127.0.10.2"
+        request_pdu_session_timeout: 15  # seconds; the 3 s default is too short for the SD-Core
       dpdk:
         enabled: false                   # set true to enable DPDK fronthaul (Benetel O-RU) on this OCUDU node
         hugepages: 2                     # number of 1 GB hugepages to pre-allocate on this host

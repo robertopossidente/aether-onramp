@@ -5,6 +5,23 @@
     msg: "Mismatch in number of servers and ocudu nodes: {{ ocudu.servers|length }} vs {{ groups['ocudu_nodes']|length }}"
   when: ocudu.servers|length != groups['ocudu_nodes']|length
 
+- name: check for a running split gNB
+  community.docker.docker_container_info:
+    name: "{{ item }}"
+  loop: [ocudu-cu, ocudu-du]
+  register: split_gnb
+  when: inventory_hostname in groups['ocudu_nodes']
+  become: true
+
+- name: refuse to start the monolithic gNB while the CU/DU split is running
+  fail:
+    msg: "Container {{ item.item }} is running; run 'make ocudu-split-stop' first"
+  loop: "{{ split_gnb.results | default([]) }}"
+  when:
+    - inventory_hostname in groups['ocudu_nodes']
+    - item.container is defined
+    - item.container.State.Running | default(false)
+
 - name: Preflight | Docker CPU availability for O-CU/DU gNB
   ansible.builtin.include_role:
     name: preflight

@@ -1,0 +1,45 @@
+f1ap:
+  addrs: "{{ cu_f1_addr }}"
+  bind_addrs: "{{ du_f1_addr }}"
+
+f1u:
+  socket:
+    - bind_addr: "{{ du_f1_addr }}"
+
+ru_sdr:
+  device_driver: zmq
+  device_args: tx_port=tcp://127.0.0.1:2000,rx_port=tcp://127.0.0.1:2001,base_srate=11.52e6
+  srate: 11.52
+  tx_gain: 0
+  rx_gain: 0
+
+# 10 MHz / 52 PRB, matching deps/ocudu/roles/uEsimulator/templates/ue_zmq_split.conf
+cell_cfg:
+  dl_arfcn: 368500
+  band: 3
+  channel_bandwidth_MHz: 10
+  common_scs: 15
+  plmn: "00101"
+  tac: 1
+  pdcch:
+    common:
+      ss0_index: 0
+      coreset0_index: 6
+    dedicated:
+      ss2_type: common
+      dci_format_0_1_and_1_1: false
+  prach:
+    prach_config_index: 1
+  pdsch:
+    mcs_table: qam64
+  pusch:
+    mcs_table: qam64
+
+log:
+  filename: stdout
+  all_level: info
+
+pcap:
+  mac_enable: false
+  f1ap_enable: false
+  f1u_enable: false

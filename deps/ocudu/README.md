@@ -21,6 +21,7 @@ cd aether-ocudu
 - `router.yml`: applies or removes routing and sysctl changes on OCUDU nodes
 - `dpdk.yml`: prepares DPDK prerequisites on OCUDU nodes when `ocudu.servers[n].dpdk.enabled` is true for that node
 - `gNB.yml`: starts and stops the OCUDU gNB container
+- `gNBSplit.yml`: starts and stops a split gNB (O-CU `ocu` + O-DU `odu` over F1) in two containers, `ocudu-cu` and `ocudu-du`
 - `uEsimulator.yml`: starts and stops the UE simulator container
 
 ## Prerequisites
@@ -282,3 +283,31 @@ For a single-node simulated setup, the minimum flow is:
 If you only want the gNB, or if `ocudu.simulation` is `false`, stop after step 4.
 In that case, do not run step 5 because the UE simulator playbook aborts when
 simulation is disabled.
+
+## CU/DU split over F1 (simulated UE, no radio hardware)
+
+Experimental profile that runs the CU and DU as separate processes/containers
+(`ocudu-cu`, `ocudu-du`) from the same `gnb_image`, connected over F1-C/F1-U on
+loopback, with the DU using the ZMQ radio and the srsUE simulator as UE. It is
+an alternative to the monolithic `ocudu-gnb` and cannot run at the same time
+(the start target fails if `ocudu-gnb` is running).
+
+Profiles: `vars/main-ocudu.yml` (monolithic) and `vars/main-ocudu-split.yml`
+(split); copy the one you want to `vars/main.yml`. Either profile can be used,
+not both at once.
+
+Settings in `ocudu.servers[n]`: `cu_conf`, `du_conf` (templates in
+`roles/gNBSplit/templates/`), `ue_conf` (must be `ue_zmq_split.conf`, which
+matches the 10 MHz cell of `du_f1_zmq.yaml`), and `f1.cu_addr`, `f1.du_addr`,
+`f1.request_pdu_session_timeout`.
+
+```bash
+make aether-ocudu-split-start   # CU, then DU
+make aether-ocudu-uesim-start   # UE with ue_conf: ue_zmq_split.conf
+make aether-ocudu-uesim-stop
+make aether-ocudu-split-stop
+```
+
+The UE start target can take up to a couple of minutes to see the tunnel
+because the F1 and registration sequence runs first. Only the F1 interface is
+split; this does not exercise O-RAN 7.2 fronthaul.

@@ -57,6 +57,8 @@ aether-srsran-uesim-start: srsran-uesim-start
 aether-srsran-uesim-stop: srsran-uesim-stop
 aether-ocudu-gnb-install: ocudu-gnb-install
 aether-ocudu-gnb-uninstall: ocudu-gnb-uninstall
+aether-ocudu-split-start: ocudu-split-start
+aether-ocudu-split-stop: ocudu-split-stop
 aether-ocudu-uesim-start: ocudu-uesim-start
 aether-ocudu-uesim-stop: ocudu-uesim-stop
 aether-oscric-ric-install: oscric-ric-install
