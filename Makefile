@@ -27,6 +27,16 @@ export KUBECTL ?= kubectl
 export KUBE_NAMESPACE ?= aether-5gc
 export WEBUI_SERVICE ?= webui
 
+export DOCKER ?= docker
+export WEBUI_GUI_DIR ?= $(AETHER_ROOT_DIR)/webui-gui
+export WEBUI_GUI_IMAGE ?= aether-webui-gui
+export WEBUI_GUI_CONTAINER ?= aether-webui-gui
+export WEBUI_GUI_PORT ?= 8088
+export WEBUI_GUI_UPSTREAM ?= http://172.30.255.119:30500
+export WEBUI_GUI_USER ?=
+export WEBUI_GUI_PASSWORD ?=
+export WEBUI_GUI_READ_ONLY ?= false
+
 
 #### Validate Ansible Configuration ####
 aether-pingall:
@@ -87,6 +97,26 @@ aether-ueransim-stop: ueransim-stop
 #### Access WebUI locally without exposing the Service ####
 webui-port-forward:
 	$(KUBECTL) -n $(KUBE_NAMESPACE) port-forward svc/$(WEBUI_SERVICE) 5000:5000 5001:5001 8080:8080
+
+#### WebUI GUI (Swagger em /docs) ####
+.PHONY: aether-webui-gui-start aether-webui-gui-stop aether-webui-gui-logs
+aether-webui-gui-start:
+	$(DOCKER) build -t $(WEBUI_GUI_IMAGE) $(WEBUI_GUI_DIR)
+	-$(DOCKER) rm -f $(WEBUI_GUI_CONTAINER)
+	$(DOCKER) run -d --name $(WEBUI_GUI_CONTAINER) --restart unless-stopped \
+		-p $(WEBUI_GUI_PORT):8088 \
+		-e WEBUI_URL=$(WEBUI_GUI_UPSTREAM) \
+		-e READ_ONLY=$(WEBUI_GUI_READ_ONLY) \
+		-e GUI_USER='$(WEBUI_GUI_USER)' \
+		-e GUI_PASSWORD='$(WEBUI_GUI_PASSWORD)' \
+		$(WEBUI_GUI_IMAGE)
+	@echo "WebUI GUI: http://<host>:$(WEBUI_GUI_PORT)/  Swagger: http://<host>:$(WEBUI_GUI_PORT)/docs"
+
+aether-webui-gui-stop:
+	-$(DOCKER) rm -f $(WEBUI_GUI_CONTAINER)
+
+aether-webui-gui-logs:
+	$(DOCKER) logs -f $(WEBUI_GUI_CONTAINER)
 
 # Rules:
 #	amp-install: amp-monitor-install amp-monitor-load

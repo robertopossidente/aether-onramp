@@ -13,6 +13,19 @@ docker run -d --name aether-webui-gui --restart unless-stopped -p 8088:8088 \
 
 Abra `http://<host>:8088/`.
 
+Pelo Makefile da raiz (constrói a imagem e recria o container):
+
+```bash
+make aether-webui-gui-start
+make aether-webui-gui-start WEBUI_GUI_UPSTREAM=http://<ip-do-no>:30500 \
+  WEBUI_GUI_USER=admin WEBUI_GUI_PASSWORD='<senha>' WEBUI_GUI_READ_ONLY=true
+make aether-webui-gui-logs   # acompanha os logs
+make aether-webui-gui-stop   # remove o container
+```
+
+Variáveis: `WEBUI_GUI_UPSTREAM`, `WEBUI_GUI_PORT` (8088), `WEBUI_GUI_USER`,
+`WEBUI_GUI_PASSWORD`, `WEBUI_GUI_READ_ONLY`, `WEBUI_GUI_IMAGE`, `WEBUI_GUI_CONTAINER`.
+
 Documentação interativa da API: `http://<host>:8088/docs`. O documento
 OpenAPI fica disponível em `http://<host>:8088/openapi.json`; o botão
 **API Swagger** na GUI abre o Swagger UI. A interface Swagger carrega
