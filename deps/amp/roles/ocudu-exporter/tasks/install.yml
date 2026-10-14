@@ -1,0 +1,38 @@
+---
+
+- name: create exporter directory
+  file:
+    path: "{{ ocudu_exporter_dir }}"
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: install exporter script
+  copy:
+    src: ocudu_exporter.py
+    dest: "{{ ocudu_exporter_dir }}/ocudu_exporter.py"
+    mode: "0755"
+  become: true
+  register: ocudu_exporter_script
+
+- name: install exporter systemd unit
+  template:
+    src: ocudu-exporter.service.j2
+    dest: /etc/systemd/system/ocudu-exporter.service
+    mode: "0644"
+  become: true
+  register: ocudu_exporter_unit
+
+- name: enable and start exporter
+  systemd:
+    name: ocudu-exporter
+    state: "{{ 'restarted' if (ocudu_exporter_script.changed or ocudu_exporter_unit.changed) else 'started' }}"
+    enabled: true
+    daemon_reload: true
+  become: true
+
+- name: wait for exporter port
+  wait_for:
+    host: 127.0.0.1
+    port: "{{ ocudu_exporter_port }}"
+    timeout: 30

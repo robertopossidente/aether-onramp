@@ -53,6 +53,8 @@ aether-gnbsim-install: gnbsim-install
 aether-gnbsim-uninstall: gnbsim-uninstall
 aether-amp-install: amp-install
 aether-amp-uninstall: amp-uninstall
+aether-amp-split-start: amp-split-start
+aether-amp-split-stop: amp-split-stop
 aether-sdran-install: sdran-install
 aether-sdran-uninstall: sdran-uninstall
 aether-ueransim-install: ueransim-install

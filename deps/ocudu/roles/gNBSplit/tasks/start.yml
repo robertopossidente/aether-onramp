@@ -55,6 +55,28 @@
     server_index: "{{ groups['ocudu_nodes'].index(inventory_hostname) }}"
   when: inventory_hostname in groups['ocudu_nodes']
 
+- name: stat split config paths
+  stat:
+    path: "{{ item }}"
+  loop:
+    - /tmp/ocudu_cu.yaml
+    - /tmp/ocudu_du.yaml
+  register: split_conf_stat
+  when: inventory_hostname in groups['ocudu_nodes']
+  become: true
+
+# Docker creates a missing bind-mount source as a directory (e.g. after /tmp is cleaned on reboot)
+- name: remove config paths wrongly created as directories
+  file:
+    path: "{{ item.item }}"
+    state: absent
+  loop: "{{ split_conf_stat.results | default([]) }}"
+  when:
+    - inventory_hostname in groups['ocudu_nodes']
+    - item.stat is defined
+    - item.stat.isdir | default(false)
+  become: true
+
 - name: copy CU config to /tmp/ocudu_cu.yaml
   template:
     src: "{{ ocudu.servers[server_index | int].cu_conf | default('cu_f1.yaml') }}"
@@ -64,6 +86,7 @@
     f1: "{{ ocudu.servers[server_index | int].f1 | default({}) }}"
     cu_f1_addr: "{{ (ocudu.servers[server_index | int].f1 | default({})).cu_addr | default('127.0.10.1') }}"
     request_pdu_session_timeout: "{{ (ocudu.servers[server_index | int].f1 | default({})).request_pdu_session_timeout | default(15) }}"
+  register: cu_config
   when: inventory_hostname in groups['ocudu_nodes']
   become: true
 
@@ -74,6 +97,8 @@
   vars:
     cu_f1_addr: "{{ (ocudu.servers[server_index | int].f1 | default({})).cu_addr | default('127.0.10.1') }}"
     du_f1_addr: "{{ (ocudu.servers[server_index | int].f1 | default({})).du_addr | default('127.0.10.2') }}"
+    du_rc_port: "{{ (ocudu.servers[server_index | int].remote_control | default({})).du_port | default(8002) }}"
+  register: du_config
   when: inventory_hostname in groups['ocudu_nodes']
   become: true
 
@@ -95,6 +120,7 @@
     interactive: false
     tty: false
     command: "ocu -c /opt/cu_config.yaml"
+    restart: "{{ cu_config.changed | default(false) }}"
   when: inventory_hostname in groups['ocudu_nodes']
   become: true
 
@@ -120,5 +146,6 @@
     interactive: false
     tty: false
     command: "odu -c /opt/du_config.yaml"
+    restart: "{{ du_config.changed | default(false) }}"
   when: inventory_hostname in groups['ocudu_nodes']
   become: true

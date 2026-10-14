@@ -1,0 +1,7 @@
+---
+ocudu_exporter_dir: /opt/ocudu-exporter
+ocudu_exporter_bind: "{{ amp.split.exporter.bind | default('0.0.0.0') }}"
+ocudu_exporter_port: "{{ amp.split.exporter.port | default(9110) }}"
+ocudu_exporter_cu_container: "{{ amp.split.exporter.cu_container | default('ocudu-cu') }}"
+ocudu_exporter_du_container: "{{ amp.split.exporter.du_container | default('ocudu-du') }}"
+ocudu_exporter_du_ws_port: "{{ amp.split.exporter.du_ws_port | default(8002) }}"

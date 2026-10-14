@@ -81,6 +81,14 @@ ocudu:
 amp:
   monitor_dashboard: "deps/amp/roles/monitor-load/templates/5g-monitoring"
 
+  split:
+    exporter:
+      bind: "0.0.0.0"
+      port: 9110
+      cu_container: ocudu-cu
+      du_container: ocudu-du
+      du_ws_port: 8002
+
   monitor:
     helm:
       chart_ref: rancher/rancher-monitoring

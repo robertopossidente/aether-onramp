@@ -1,0 +1,23 @@
+---
+
+- name: stop and disable exporter
+  systemd:
+    name: ocudu-exporter
+    state: stopped
+    enabled: false
+  become: true
+  failed_when: false
+
+- name: remove exporter files
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/system/ocudu-exporter.service
+    - "{{ ocudu_exporter_dir }}"
+  become: true
+
+- name: reload systemd
+  systemd:
+    daemon_reload: true
+  become: true

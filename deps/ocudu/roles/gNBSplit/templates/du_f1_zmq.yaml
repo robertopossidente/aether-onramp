@@ -39,6 +39,22 @@ log:
   filename: stdout
   all_level: info
 
+# JSON metrics are served through the local remote control WebSocket
+# (command metrics_subscribe), consumed by the AMP ocudu-exporter.
+metrics:
+  enable_json: true
+  layers:
+    enable_sched: true
+    enable_rlc: true
+    enable_mac: true
+  periodicity:
+    du_report_period: 1000
+
+remote_control:
+  enabled: true
+  bind_addr: 127.0.0.1
+  port: {{ du_rc_port }}
+
 pcap:
   mac_enable: false
   f1ap_enable: false

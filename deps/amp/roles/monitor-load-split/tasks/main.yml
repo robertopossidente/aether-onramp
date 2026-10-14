@@ -1,0 +1,9 @@
+---
+
+- name: install amp/monitor-load-split
+  import_tasks: roles/monitor-load-split/tasks/install.yml
+  tags: install
+
+- name: uninstall amp/monitor-load-split
+  import_tasks: roles/monitor-load-split/tasks/uninstall.yml
+  tags: uninstall

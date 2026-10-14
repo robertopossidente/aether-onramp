@@ -1,0 +1,9 @@
+---
+
+- name: install amp/ocudu-exporter
+  import_tasks: roles/ocudu-exporter/tasks/install.yml
+  tags: install
+
+- name: uninstall amp/ocudu-exporter
+  import_tasks: roles/ocudu-exporter/tasks/uninstall.yml
+  tags: uninstall

@@ -1,0 +1,53 @@
+---
+
+- name: install kubernetes.core python prerequisite for amp/monitor-load-split
+  import_role:
+    name: preflight
+    tasks_from: python_kubernetes.yml
+
+- name: verify kubeconfig prerequisites for amp/monitor-load-split
+  import_role:
+    name: preflight
+    tasks_from: kubeconfig.yml
+  vars:
+    kubeconfig_component_name: AMP monitor-load-split
+    kubeconfig_help_text: >-
+      Run make aether-amp-install first (Prometheus/Grafana stack).
+
+- name: ensure namespaces exist
+  kubernetes.core.k8s:
+    name: "{{ item }}"
+    kind: Namespace
+    state: present
+  loop:
+    - aether-5gc
+    - cattle-dashboards
+
+- name: create staging directory
+  file:
+    path: /tmp/monitoring-split
+    state: directory
+    mode: "0755"
+
+- name: render kustomization and exporter manifests
+  template:
+    src: "{{ item.src }}"
+    dest: "/tmp/monitoring-split/{{ item.dest }}"
+    mode: "0644"
+  loop:
+    - { src: kustomization.yaml.j2, dest: kustomization.yaml }
+    - { src: ocudu-exporter.yaml.j2, dest: ocudu-exporter.yaml }
+
+- name: copy split dashboard
+  copy:
+    src: 5g-split-dashboard.json
+    dest: /tmp/monitoring-split/5g-split-dashboard.json
+    mode: "0644"
+
+- name: apply split monitoring resources
+  command: kubectl apply -k /tmp/monitoring-split
+
+- name: remove staging directory
+  file:
+    path: /tmp/monitoring-split
+    state: absent

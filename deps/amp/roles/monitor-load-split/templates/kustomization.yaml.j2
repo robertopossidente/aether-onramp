@@ -1,0 +1,12 @@
+resources:
+  - ./ocudu-exporter.yaml
+
+configMapGenerator:
+  - name: grafana-aether-split-dashboards
+    namespace: cattle-dashboards
+    files:
+      - ./5g-split-dashboard.json
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    grafana_dashboard: "1"

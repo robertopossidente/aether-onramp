@@ -23,6 +23,21 @@ log:
   filename: stdout
   all_level: info
 
+# CU metrics are printed to the container log ([METRICS] lines) because the
+# ocu binary has no JSON/remote-control gateway; the DU serves JSON through the
+# local remote control WebSocket (command metrics_subscribe). Both are consumed
+# by the AMP ocudu-exporter.
+metrics:
+  enable_log: true
+  layers:
+    enable_ngap: true
+    enable_rrc: true
+    enable_pdcp: true
+    enable_e1ap: true
+  periodicity:
+    cu_cp_report_period: 1000
+    cu_up_report_period: 1000
+
 pcap:
   ngap_enable: false
   f1ap_enable: false

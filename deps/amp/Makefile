@@ -22,6 +22,22 @@ amp-pingall:
 amp-install: amp-monitor-install amp-monitor-load
 amp-uninstall: amp-monitor-uninstall
 
+#### c.2 Split (CU/DU) monitoring ####
+amp-split-start: ocudu-split-start amp-split-exporter-install amp-split-monitor-load
+amp-split-stop: amp-split-monitor-uninstall amp-split-exporter-uninstall
+amp-split-exporter-install:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(AMP_ROOT_DIR)/split.yml --tags install --limit ocudu_nodes \
+		--extra-vars "ROOT_DIR=$(ROOT_DIR)" --extra-vars $(EXTRA_VARS)
+amp-split-exporter-uninstall:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(AMP_ROOT_DIR)/split.yml --tags uninstall --limit ocudu_nodes \
+		--extra-vars "ROOT_DIR=$(ROOT_DIR)" --extra-vars $(EXTRA_VARS)
+amp-split-monitor-load:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(AMP_ROOT_DIR)/split.yml --tags install --limit master_nodes \
+		--extra-vars "ROOT_DIR=$(ROOT_DIR)" --extra-vars $(EXTRA_VARS)
+amp-split-monitor-uninstall:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(AMP_ROOT_DIR)/split.yml --tags uninstall --limit master_nodes \
+		--extra-vars "ROOT_DIR=$(ROOT_DIR)" --extra-vars $(EXTRA_VARS)
+
 #### c. Provision Monitoring ####
 amp-monitor-install:
 	ansible-playbook -i $(HOSTS_INI_FILE) $(AMP_ROOT_DIR)/monitor.yml --tags install \

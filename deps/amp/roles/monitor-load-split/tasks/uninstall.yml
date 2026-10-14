@@ -1,0 +1,9 @@
+---
+
+- name: remove split monitoring resources
+  command: "kubectl delete {{ item }} --ignore-not-found"
+  loop:
+    - servicemonitor/ocudu-exporter -n aether-5gc
+    - endpoints/ocudu-exporter -n aether-5gc
+    - service/ocudu-exporter -n aether-5gc
+    - configmap/grafana-aether-split-dashboards -n cattle-dashboards
