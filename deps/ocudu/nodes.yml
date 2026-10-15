@@ -1,0 +1,220 @@
+---
+
+# Creates node2/node3 (every host in [ocudu_nodes]) as Docker-in-Docker containers
+# on the master node. Container name = inventory hostname, container IP = ansible_host.
+
+- name: simulate OCUDU nodes as containers
+  hosts: master_nodes
+  gather_facts: false
+  run_once: true
+
+  vars_files:
+    - "vars/main.yml"
+
+  vars:
+    nc: "{{ ocudu.node_containers }}"
+    node_names: "{{ groups['ocudu_nodes'] }}"
+    gnb_images:
+      - "{{ ocudu.docker.container.gnb_image }}"
+      - "{{ ocudu.docker.container.ue_image }}"
+    access_net: "{{ core.upf.access_subnet | ansible.utils.ipaddr('network/prefix') }}"
+
+  tasks:
+    - name: node containers must be enabled
+      ansible.builtin.assert:
+        that: nc.enabled | default(false) | bool
+        fail_msg: "Set ocudu.node_containers.enabled: true to simulate the OCUDU nodes as containers"
+      tags: [up, down]
+
+    - name: validate node addresses
+      ansible.builtin.assert:
+        that:
+          - ocudu.servers | length == node_names | length
+          - hostvars[item].ansible_host == ocudu.servers[idx | int].gnb_ip
+          - hostvars[item].ansible_host | ansible.utils.ipaddr(nc.network.subnet) | length > 0
+          - hostvars[item].ansible_host != nc.network.gateway
+        fail_msg: >-
+          {{ item }}: ansible_host must equal ocudu.servers[{{ idx }}].gnb_ip and lie inside
+          {{ nc.network.subnet }} (not the gateway {{ nc.network.gateway }})
+      vars:
+        idx: "{{ node_names.index(item) }}"
+      loop: "{{ node_names }}"
+      tags: [up]
+
+    - name: build node image
+      community.docker.docker_image:
+        name: "{{ nc.image }}"
+        source: build
+        build:
+          path: "{{ playbook_dir }}/nodes"
+        force_source: false
+      tags: [up]
+
+    - name: create node network
+      community.docker.docker_network:
+        name: "{{ nc.network.name }}"
+        driver: bridge
+        ipam_config:
+          - subnet: "{{ nc.network.subnet }}"
+            gateway: "{{ nc.network.gateway }}"
+      become: true
+      tags: [up]
+
+    - name: create node containers
+      community.docker.docker_container:
+        name: "{{ item }}"
+        hostname: "{{ item }}"
+        image: "{{ nc.image }}"
+        privileged: true
+        restart_policy: unless-stopped
+        state: started
+        networks:
+          - name: "{{ nc.network.name }}"
+            ipv4_address: "{{ hostvars[item].ansible_host }}"
+        volumes:
+          - "{{ item }}-docker:/var/lib/docker"
+        env:
+          NODE_USER: "{{ hostvars[item].ansible_user | default('aether') }}"
+          NODE_PASSWORD: "{{ hostvars[item].ansible_password | default('aether') }}"
+      loop: "{{ node_names }}"
+      become: true
+      tags: [up]
+
+    - name: allow N3 between the node network and the UPF access network
+      ansible.builtin.iptables:
+        chain: DOCKER-USER
+        source: "{{ item.src }}"
+        destination: "{{ item.dst }}"
+        jump: ACCEPT
+        action: insert
+        rule_num: 1
+        comment: aether-ocudu-nodes
+      loop:
+        - { src: "{{ nc.network.subnet }}", dst: "{{ access_net }}" }
+        - { src: "{{ access_net }}", dst: "{{ nc.network.subnet }}" }
+      become: true
+      tags: [up]
+
+    - name: bypass Docker's direct-access drop for traffic from the UPF access network
+      ansible.builtin.iptables:
+        table: raw
+        chain: PREROUTING
+        source: "{{ access_net }}"
+        destination: "{{ nc.network.subnet }}"
+        jump: ACCEPT
+        action: insert
+        rule_num: 1
+        comment: aether-ocudu-nodes
+      become: true
+      tags: [up]
+
+    - name: do not masquerade node traffic towards the UPF access network
+      ansible.builtin.iptables:
+        table: nat
+        chain: POSTROUTING
+        source: "{{ nc.network.subnet }}"
+        destination: "{{ access_net }}"
+        jump: RETURN
+        action: insert
+        rule_num: 1
+        comment: aether-ocudu-nodes
+      become: true
+      tags: [up]
+
+    - name: wait for SSH on the nodes
+      ansible.builtin.wait_for:
+        host: "{{ hostvars[item].ansible_host }}"
+        port: 22
+        search_regex: OpenSSH
+        timeout: 120
+      loop: "{{ node_names }}"
+      tags: [up]
+
+    - name: wait for the Docker daemon inside the nodes
+      ansible.builtin.command: docker exec {{ item }} docker info
+      register: node_dockerd
+      retries: 30
+      delay: 2
+      until: node_dockerd.rc == 0
+      changed_when: false
+      loop: "{{ node_names }}"
+      become: true
+      tags: [up]
+
+    # Avoids a pull per node; images missing on the master (or already in the node) are skipped.
+    - name: preload OCUDU images into the nodes
+      ansible.builtin.shell: |
+        set -o pipefail
+        docker image inspect {{ item.1 }} >/dev/null 2>&1 || exit 0
+        docker exec {{ item.0 }} docker image inspect {{ item.1 }} >/dev/null 2>&1 && exit 0
+        docker save {{ item.1 }} | docker exec -i {{ item.0 }} docker load
+      args:
+        executable: /bin/bash
+      register: preload
+      changed_when: "'Loaded image' in preload.stdout"
+      loop: "{{ node_names | product(gnb_images) | list }}"
+      become: true
+      tags: [up]
+
+    - name: remove node containers
+      community.docker.docker_container:
+        name: "{{ item }}"
+        state: absent
+        keep_volumes: "{{ not (purge_volumes | default(false) | bool) }}"
+      loop: "{{ node_names }}"
+      become: true
+      tags: [down]
+
+    - name: remove node image volumes
+      community.docker.docker_volume:
+        name: "{{ item }}-docker"
+        state: absent
+      loop: "{{ node_names }}"
+      when: purge_volumes | default(false) | bool
+      become: true
+      tags: [down]
+
+    - name: remove node network
+      community.docker.docker_network:
+        name: "{{ nc.network.name }}"
+        state: absent
+      become: true
+      tags: [down]
+
+    - name: remove N3 forwarding rules
+      ansible.builtin.iptables:
+        chain: DOCKER-USER
+        source: "{{ item.src }}"
+        destination: "{{ item.dst }}"
+        jump: ACCEPT
+        comment: aether-ocudu-nodes
+        state: absent
+      loop:
+        - { src: "{{ nc.network.subnet }}", dst: "{{ access_net }}" }
+        - { src: "{{ access_net }}", dst: "{{ nc.network.subnet }}" }
+      become: true
+      tags: [down]
+
+    - name: remove raw PREROUTING bypass
+      ansible.builtin.iptables:
+        table: raw
+        chain: PREROUTING
+        source: "{{ access_net }}"
+        destination: "{{ nc.network.subnet }}"
+        jump: ACCEPT
+        comment: aether-ocudu-nodes
+        state: absent
+      become: true
+      tags: [down]
+
+    - name: remove masquerade exemption
+      ansible.builtin.iptables:
+        table: nat
+        chain: POSTROUTING
+        source: "{{ nc.network.subnet }}"
+        destination: "{{ access_net }}"
+        jump: RETURN
+        comment: aether-ocudu-nodes
+        state: absent
+      become: true
+      tags: [down]

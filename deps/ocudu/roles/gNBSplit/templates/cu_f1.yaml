@@ -1,3 +1,5 @@
+gnb_id: {{ gnb_id }}
+
 cu_cp:
   amf:
     addrs: "{{ core.amf.ip }}"
@@ -15,6 +17,10 @@ cu_cp:
     bind_addrs: "{{ cu_f1_addr }}"
 
 cu_up:
+  ngu:
+    socket:
+      - bind_addr: "{{ gnb_ip }}"
+        ext_addr: "{{ gnb_ip }}"
   f1u:
     socket:
       - bind_addr: "{{ cu_f1_addr }}"

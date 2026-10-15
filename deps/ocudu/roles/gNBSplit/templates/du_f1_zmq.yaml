@@ -1,3 +1,6 @@
+gnb_id: {{ gnb_id }}
+gnb_du_id: {{ gnb_du_id }}
+
 f1ap:
   addrs: "{{ cu_f1_addr }}"
   bind_addrs: "{{ du_f1_addr }}"
@@ -8,7 +11,7 @@ f1u:
 
 ru_sdr:
   device_driver: zmq
-  device_args: tx_port=tcp://127.0.0.1:2000,rx_port=tcp://127.0.0.1:2001,base_srate=11.52e6
+  device_args: tx_port=tcp://127.0.0.1:{{ zmq_port }},rx_port=tcp://127.0.0.1:{{ zmq_port | int + 1 }},base_srate=11.52e6
   srate: 11.52
   tx_gain: 0
   rx_gain: 0
@@ -21,6 +24,7 @@ cell_cfg:
   common_scs: 15
   plmn: "00101"
   tac: 1
+  pci: {{ cell_pci }}
   pdcch:
     common:
       ss0_index: 0

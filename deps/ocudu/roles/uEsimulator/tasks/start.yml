@@ -1,5 +1,10 @@
 ---
 
+- name: resolve instance suffix
+  ansible.builtin.set_fact:
+    instance_suffix: "{{ ocudu.servers[groups['ocudu_nodes'].index(inventory_hostname)].instance_suffix | default('') }}"
+  when: inventory_hostname in groups['ocudu_nodes']
+
 - name: check if servers and config server length are equal
   fail:
     msg: "Mismatch in number of servers and ocudu nodes: {{ ocudu.servers|length }} vs {{ groups['ocudu_nodes']|length }}"
@@ -20,30 +25,32 @@
   when: inventory_hostname in groups['ocudu_nodes']
   become: true
 
-- name: remove /tmp/ue_zmq.conf
+- name: remove /tmp/ue_zmq{{ instance_suffix }}.conf
   file:
-    path: "/tmp/ue_zmq.conf"
+    path: "/tmp/ue_zmq{{ instance_suffix }}.conf"
     state: absent
   when: inventory_hostname in groups['ocudu_nodes']
   become: true
 
-- name : copy ue_zmq config file to /tmp/ue_zmq.conf
+- name : copy ue_zmq config file to /tmp/ue_zmq{{ instance_suffix }}.conf
   template:
     src: "{{ ocudu.servers[server_index | int].ue_conf }}"
-    dest: /tmp/ue_zmq.conf
+    dest: /tmp/ue_zmq{{ instance_suffix }}.conf
   vars:
     server_index: "{{ groups['ocudu_nodes'].index(inventory_hostname) }}"
+    zmq_port: "{{ ocudu.servers[server_index | int].zmq_port | default(2000) }}"
+    ue_imsi: "{{ (ocudu.servers[server_index | int].ue | default({})).imsi | default('%015d' | format(1010100007500 + (server_index | int))) }}"
   when: inventory_hostname in groups['ocudu_nodes']
   become: true
 
 - name: create {{ ocudu.docker.container.ue_image }} containers
   community.docker.docker_container:
-    name: "rfsim5g-nr-ue"
+    name: "rfsim5g-nr-ue{{ instance_suffix }}"
     image: "{{ ocudu.docker.container.ue_image }}"
     networks:
       - name: "{{ ocudu.docker.network.name }}"
     volumes:
-      - /tmp/ue_zmq.conf:/opt/ue_zmq.conf
+      - /tmp/ue_zmq{{ instance_suffix }}.conf:/opt/ue_zmq.conf
     devices:
       - /dev/net/tun:/dev/net/tun
     privileged: true
@@ -58,7 +65,7 @@
 
 - name: wait for UE tunnel interface
   community.docker.docker_container_exec:
-    container: rfsim5g-nr-ue
+    container: "rfsim5g-nr-ue{{ instance_suffix }}"
     command: "ip netns exec ue1 ip link show tun_srsue"
   register: ocudu_ue_tunnel
   retries: 60
@@ -70,7 +77,7 @@
 
 - name: add default route for UE
   community.docker.docker_container_exec:
-    container: rfsim5g-nr-ue
+    container: "rfsim5g-nr-ue{{ instance_suffix }}"
     command: >-
       ip netns exec ue1 ip route replace default via
       {{ (core.upf.default_upf.ue_ip_pool.split('.'))[:3] | join('.') }}.{{ (core.upf.default_upf.ue_ip_pool.split('.')[3] | int) + 1 }}
@@ -84,7 +91,7 @@
 
 - name: run ping command to check if the UE is running and show output
   community.docker.docker_container_exec:
-    container: rfsim5g-nr-ue
+    container: "rfsim5g-nr-ue{{ instance_suffix }}"
     command: "ip netns exec ue1 ping -c 5 {{ ping_target }}"
   register: uEsimPingOutput
   changed_when: false

@@ -49,7 +49,7 @@
       - add
       - "{{ core.upf.access_subnet | ansible.utils.ipaddr('network/prefix') }}"
       - via
-      - "{{ core.amf.ip }}"
+      - "{{ ocudu.node_containers.network.gateway if (ocudu.node_containers.enabled | default(false) | bool) else core.amf.ip }}"
   when: (inventory_hostname in groups['ocudu_nodes']) and (inventory_hostname not in groups['master_nodes']) and core.upf.multihop_gnb == false
   become: true
   ignore_errors: yes

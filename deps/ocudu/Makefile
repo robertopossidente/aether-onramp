@@ -16,6 +16,14 @@ ocudu-docker-install:
 	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/docker.yml --tags install \
 		--extra-vars $(EXTRA_VARS)
 
+#### a2. Simulated nodes (node2/node3 as Docker-in-Docker containers on the master node) ####
+ocudu-nodes-up:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/nodes.yml --tags up \
+		--extra-vars $(EXTRA_VARS)
+ocudu-nodes-down:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/nodes.yml --tags down \
+		--extra-vars $(EXTRA_VARS)
+
 ocudu-router-install:
 	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/router.yml --tags install \
 		--extra-vars $(EXTRA_VARS)

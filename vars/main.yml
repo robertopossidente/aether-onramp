@@ -1,5 +1,8 @@
 # OCUDU split profile (O-CU + O-DU over F1, ZMQ radio, simulated UE).
-# Use with: make aether-ocudu-split-start / aether-ocudu-uesim-start. Do not run together with the monolithic gNB (main-ocudu.yml).
+# Multiple split gNBs, one CU+DU pair per node. Core on node1 (master_nodes); node2 and node3 in [ocudu_nodes], in that order.
+# node2/node3 are Docker containers on node1 (ocudu.node_containers); their IPs are the ansible_host values in hosts.ini.
+# Set core.amf.ip to node1's IP. Sequence: aether-5gc-install; aether-ocudu-nodes-up; aether-ocudu-hosts-install;
+# ocudu-router-install; aether-ocudu-split-start; aether-ocudu-uesim-start. Do not run together with the monolithic gNB.
 proxy:
   enabled: false
   http_proxy: ""
@@ -26,7 +29,7 @@ k8s:
 core:
   data_iface: eth0
   values_file: "deps/5gc/roles/core/templates/sdcore-5g-values.yaml"
-  ran_subnet: ""    # set to empty string to get subnet from 'data_iface'
+  ran_subnet: "172.28.10.0/24"    # ocudu.node_containers.network.subnet
   helm:
     local_charts: false      # set chart_ref to local path name if true
     chart_ref: oci://ghcr.io/omec-project/sd-core
@@ -58,36 +61,49 @@ ocudu:
     network:
       name: host
   simulation: true
+  node_containers:
+    enabled: true
+    image: aether-ocudu-node:latest
+    network:
+      name: aether-ran
+      subnet: "172.28.10.0/24"
+      gateway: "172.28.10.1"           # bridge address on node1; next hop to the UPF access network
   servers:
     0:
-      gnb_ip: "172.30.255.119"           # Host interface used for the gNB
-      gnb_conf: gnb_zmq.yaml             # deps/ocudu/roles/gNB/templates/; use gnb_dpdk_benetel.yaml for DPDK+OFH
-      ue_conf: ue_zmq_split.conf         # deps/ocudu/roles/uEsimulator/templates/; 10 MHz UE matching the split DU cell
+      gnb_ip: "172.28.10.2"               # node2 container: gNB1 = CU1 + DU1 (first host in [ocudu_nodes])
+      gnb_id: 1000                       # optional; default 1000 + index
+      pci: 1                             # optional; default 1 + index
+      ue:
+        imsi: "001010100007500"          # optional; default 001010100007500 + index; provision it in the core
+      gnb_conf: gnb_zmq.yaml
+      ue_conf: ue_zmq_split.conf         # 10 MHz UE matching the split DU cell
       cu_conf: cu_f1.yaml                # deps/ocudu/roles/gNBSplit/templates/
-      du_conf: du_f1_zmq.yaml            # deps/ocudu/roles/gNBSplit/templates/
+      du_conf: du_f1_zmq.yaml
       f1:
-        cu_addr: "127.0.10.1"
+        cu_addr: "127.0.10.1"            # loopback addresses may repeat across hosts
         du_addr: "127.0.10.2"
         request_pdu_session_timeout: 15  # seconds; the 3 s default is too short for the SD-Core
       dpdk:
-        enabled: false                   # set true to enable DPDK fronthaul (Benetel O-RU) on this OCUDU node
-        hugepages: 2                     # number of 1 GB hugepages to pre-allocate on this host
-        pf_iface: "enp81s0f3np3"         # Fronthaul PF interface used to create VF 0 on the OCUDU host
-        vf_bdf: "0000:51:19.0"
-        du_mac_addr: "00:33:22:33:00:11"
-        ru_mac_addr: "70:b3:d5:e1:5e:7e" # Benetel RU fronthaul port MAC
-        isolated_cpus: "3-15"            # CPU range to isolate for DPDK
+        enabled: false
+    1:
+      gnb_ip: "172.28.10.3"               # node3 container: gNB2 = CU2 + DU2
+      gnb_id: 1001
+      pci: 2
+      ue:
+        imsi: "001010100007501"
+      gnb_conf: gnb_zmq.yaml
+      ue_conf: ue_zmq_split.conf
+      cu_conf: cu_f1.yaml
+      du_conf: du_f1_zmq.yaml
+      f1:
+        cu_addr: "127.0.10.1"
+        du_addr: "127.0.10.2"
+        request_pdu_session_timeout: 15
+      dpdk:
+        enabled: false
 
 amp:
   monitor_dashboard: "deps/amp/roles/monitor-load/templates/5g-monitoring"
-
-  split:
-    exporter:
-      bind: "0.0.0.0"
-      port: 9110
-      cu_container: ocudu-cu
-      du_container: ocudu-du
-      du_ws_port: 8002
 
   monitor:
     helm:

@@ -1,15 +1,20 @@
 ---
 
+- name: resolve instance suffix
+  ansible.builtin.set_fact:
+    instance_suffix: "{{ ocudu.servers[groups['ocudu_nodes'].index(inventory_hostname)].instance_suffix | default('') }}"
+  when: inventory_hostname in groups['ocudu_nodes']
+
 - name: delete ocudu-du container
   community.docker.docker_container:
-    name: ocudu-du
+    name: "ocudu-du{{ instance_suffix }}"
     state: absent
   when: inventory_hostname in groups['ocudu_nodes']
   become: true
 
 - name: delete ocudu-cu container
   community.docker.docker_container:
-    name: ocudu-cu
+    name: "ocudu-cu{{ instance_suffix }}"
     state: absent
   when: inventory_hostname in groups['ocudu_nodes']
   become: true
@@ -19,7 +24,7 @@
     path: "{{ item }}"
     state: absent
   loop:
-    - /tmp/ocudu_cu.yaml
-    - /tmp/ocudu_du.yaml
+    - "/tmp/ocudu_cu{{ instance_suffix }}.yaml"
+    - "/tmp/ocudu_du{{ instance_suffix }}.yaml"
   when: inventory_hostname in groups['ocudu_nodes']
   become: true

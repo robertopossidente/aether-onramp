@@ -1,5 +1,10 @@
 ---
 
+- name: resolve instance suffix
+  ansible.builtin.set_fact:
+    instance_suffix: "{{ ocudu.servers[groups['ocudu_nodes'].index(inventory_hostname)].instance_suffix | default('') }}"
+  when: inventory_hostname in groups['ocudu_nodes']
+
 - name: check if servers and config server length are equal
   fail:
     msg: "Mismatch in number of servers and ocudu nodes: {{ ocudu.servers|length }} vs {{ groups['ocudu_nodes']|length }}"
@@ -7,14 +12,14 @@
 
 - name: delete {{ ocudu.docker.container.ue_image }} container
   community.docker.docker_container:
-    name: "rfsim5g-nr-ue"
+    name: "rfsim5g-nr-ue{{ instance_suffix }}"
     state: absent
   when: inventory_hostname in groups['ocudu_nodes']
   become: true
 
-- name: remove /tmp/ue_zmq.conf
+- name: remove /tmp/ue_zmq{{ instance_suffix }}.conf
   file:
-    path: "/tmp/ue_zmq.conf"
+    path: "/tmp/ue_zmq{{ instance_suffix }}.conf"
     state: absent
   when: inventory_hostname in groups['ocudu_nodes']
   become: true

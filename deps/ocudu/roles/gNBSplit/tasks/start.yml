@@ -53,14 +53,15 @@
 - name: resolve per-host OCUDU split settings
   ansible.builtin.set_fact:
     server_index: "{{ groups['ocudu_nodes'].index(inventory_hostname) }}"
+    instance_suffix: "{{ ocudu.servers[groups['ocudu_nodes'].index(inventory_hostname)].instance_suffix | default('') }}"
   when: inventory_hostname in groups['ocudu_nodes']
 
 - name: stat split config paths
   stat:
     path: "{{ item }}"
   loop:
-    - /tmp/ocudu_cu.yaml
-    - /tmp/ocudu_du.yaml
+    - "/tmp/ocudu_cu{{ instance_suffix }}.yaml"
+    - "/tmp/ocudu_du{{ instance_suffix }}.yaml"
   register: split_conf_stat
   when: inventory_hostname in groups['ocudu_nodes']
   become: true
@@ -80,9 +81,10 @@
 - name: copy CU config to /tmp/ocudu_cu.yaml
   template:
     src: "{{ ocudu.servers[server_index | int].cu_conf | default('cu_f1.yaml') }}"
-    dest: /tmp/ocudu_cu.yaml
+    dest: "/tmp/ocudu_cu{{ instance_suffix }}.yaml"
   vars:
     gnb_ip: "{{ ocudu.servers[server_index | int].gnb_ip }}"
+    gnb_id: "{{ ocudu.servers[server_index | int].gnb_id | default((server_index | int) + 1000) }}"
     f1: "{{ ocudu.servers[server_index | int].f1 | default({}) }}"
     cu_f1_addr: "{{ (ocudu.servers[server_index | int].f1 | default({})).cu_addr | default('127.0.10.1') }}"
     request_pdu_session_timeout: "{{ (ocudu.servers[server_index | int].f1 | default({})).request_pdu_session_timeout | default(15) }}"
@@ -93,8 +95,12 @@
 - name: copy DU config to /tmp/ocudu_du.yaml
   template:
     src: "{{ ocudu.servers[server_index | int].du_conf | default('du_f1_zmq.yaml') }}"
-    dest: /tmp/ocudu_du.yaml
+    dest: "/tmp/ocudu_du{{ instance_suffix }}.yaml"
   vars:
+    gnb_id: "{{ ocudu.servers[server_index | int].gnb_id | default((server_index | int) + 1000) }}"
+    zmq_port: "{{ ocudu.servers[server_index | int].zmq_port | default(2000) }}"
+    gnb_du_id: "{{ ocudu.servers[server_index | int].gnb_du_id | default((server_index | int) + 1) }}"
+    cell_pci: "{{ ocudu.servers[server_index | int].pci | default((server_index | int) + 1) }}"
     cu_f1_addr: "{{ (ocudu.servers[server_index | int].f1 | default({})).cu_addr | default('127.0.10.1') }}"
     du_f1_addr: "{{ (ocudu.servers[server_index | int].f1 | default({})).du_addr | default('127.0.10.2') }}"
     du_rc_port: "{{ (ocudu.servers[server_index | int].remote_control | default({})).du_port | default(8002) }}"
@@ -104,12 +110,12 @@
 
 - name: create ocudu-cu container
   community.docker.docker_container:
-    name: ocudu-cu
+    name: "ocudu-cu{{ instance_suffix }}"
     image: "{{ ocudu.docker.container.gnb_image }}"
     networks:
       - name: "{{ ocudu.docker.network.name }}"
     volumes:
-      - /tmp/ocudu_cu.yaml:/opt/cu_config.yaml
+      - "/tmp/ocudu_cu{{ instance_suffix }}.yaml:/opt/cu_config.yaml"
     capabilities:
       - SYS_NICE
       - IPC_LOCK
@@ -130,12 +136,12 @@
 
 - name: create ocudu-du container
   community.docker.docker_container:
-    name: ocudu-du
+    name: "ocudu-du{{ instance_suffix }}"
     image: "{{ ocudu.docker.container.gnb_image }}"
     networks:
       - name: "{{ ocudu.docker.network.name }}"
     volumes:
-      - /tmp/ocudu_du.yaml:/opt/du_config.yaml
+      - "/tmp/ocudu_du{{ instance_suffix }}.yaml:/opt/du_config.yaml"
     capabilities:
       - SYS_NICE
       - IPC_LOCK

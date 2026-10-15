@@ -5,7 +5,7 @@
     msg: "Mismatch in number of servers and ocudu nodes: {{ ocudu.servers|length }} vs {{ groups['ocudu_nodes']|length }}"
   when: ocudu.servers|length != groups['ocudu_nodes']|length
 
-- name: "remove a static route on ocudu host for {{ core.upf.access_subnet | ansible.utils.ipaddr('network/prefix') }} via {{ core.amf.ip }}"
+- name: "remove a static route on ocudu host for {{ core.upf.access_subnet | ansible.utils.ipaddr('network/prefix') }} via {{ ocudu.node_containers.network.gateway if (ocudu.node_containers.enabled | default(false) | bool) else core.amf.ip }}"
   command:
     argv:
       - ip
@@ -13,7 +13,7 @@
       - del
       - "{{ core.upf.access_subnet | ansible.utils.ipaddr('network/prefix') }}"
       - via
-      - "{{ core.amf.ip }}"
+      - "{{ ocudu.node_containers.network.gateway if (ocudu.node_containers.enabled | default(false) | bool) else core.amf.ip }}"
   when: (inventory_hostname in groups['ocudu_nodes']) and (inventory_hostname not in groups['master_nodes']) and core.upf.multihop_gnb == false
   become: true
   ignore_errors: yes
@@ -57,12 +57,16 @@
 - name: force systemd to reread configs
   systemd:
     daemon_reload: true
-  when: inventory_hostname in groups['ocudu_nodes']
+  when:
+    - inventory_hostname in groups['ocudu_nodes']
+    - ansible_service_mgr == 'systemd'
   become: true
 
 - name: restart systemd-networkd
   systemd:
     name: systemd-networkd
     state: restarted
-  when: inventory_hostname in groups['ocudu_nodes']
+  when:
+    - inventory_hostname in groups['ocudu_nodes']
+    - ansible_service_mgr == 'systemd'
   become: true

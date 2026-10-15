@@ -301,6 +301,36 @@ Settings in `ocudu.servers[n]`: `cu_conf`, `du_conf` (templates in
 matches the 10 MHz cell of `du_f1_zmq.yaml`), and `f1.cu_addr`, `f1.du_addr`,
 `f1.request_pdu_session_timeout`.
 
+Multiple gNBs: use one CU+DU pair per host (hosts in `[ocudu_nodes]`, one
+`ocudu.servers` entry each; see `vars/main-ocudu-split-multi.yml`). Per-server
+optional keys: `gnb_id` (default 1000+index), `gnb_du_id` and `pci` (default
+1+index), and `ue.imsi` (default `001010100007500`+index, which must be
+provisioned in the core). Prepare the hosts with `make aether-ocudu-hosts-install`.
+
+Nodes as containers: with `ocudu.node_containers.enabled: true`, node2 and node3
+(every host in `[ocudu_nodes]`) are Docker-in-Docker containers (Ubuntu + sshd +
+dockerd, image built from `deps/ocudu/nodes/`) created on the master node. Each has
+its own network namespace, so the F1 (`127.0.10.x`) and ZMQ addresses can repeat
+and CU1+DU1 / CU2+DU2 stay one pair per node. Container IPs are the `ansible_host`
+values in `hosts.ini`; they must equal `ocudu.servers[n].gnb_ip` and lie inside
+`ocudu.node_containers.network.subnet` (default `172.28.10.0/24`, gateway
+`172.28.10.1`; node2 `.2`, node3 `.3`). The nodes playbook also adds the N3 rules
+(DOCKER-USER accept, NAT exemption) between that subnet and the UPF access network,
+and the router role uses the bridge gateway as next hop to the UPF access subnet.
+Set `core.ran_subnet` to the same subnet and reinstall/upgrade the core so the UPF
+routes N3 to it.
+
+```bash
+make aether-ocudu-nodes-up        # build image, network, containers, preload OCUDU images
+make aether-ocudu-hosts-install   # docker role (no-op: Docker is already in the image)
+make ocudu-router-install         # routes/sysctls inside the nodes
+make aether-ocudu-nodes-down      # remove containers/network/rules (-e purge_volumes=true also drops inner images)
+```
+
+Two gNB+UE pairs on one machine are CPU-heavy (each DU busy-polls the ZMQ radio);
+if Ansible times out waiting for `sudo` or the UE does not attach, start one node at a
+time (`--limit node2`). After restarting a DU, restart its UE too (and vice versa).
+
 ```bash
 make aether-ocudu-split-start   # CU, then DU
 make aether-ocudu-uesim-start   # UE with ue_conf: ue_zmq_split.conf

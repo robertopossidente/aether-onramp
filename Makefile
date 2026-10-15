@@ -69,6 +69,9 @@ aether-srsran-uesim-start: srsran-uesim-start
 aether-srsran-uesim-stop: srsran-uesim-stop
 aether-ocudu-gnb-install: ocudu-gnb-install
 aether-ocudu-gnb-uninstall: ocudu-gnb-uninstall
+aether-ocudu-nodes-up: ocudu-nodes-up
+aether-ocudu-nodes-down: ocudu-nodes-down
+aether-ocudu-hosts-install: ocudu-docker-install
 aether-ocudu-split-start: ocudu-split-start
 aether-ocudu-split-stop: ocudu-split-stop
 aether-ocudu-uesim-start: ocudu-uesim-start

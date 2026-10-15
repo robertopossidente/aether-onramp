@@ -1,0 +1,116 @@
+# OCUDU split profile (O-CU + O-DU over F1, ZMQ radio, simulated UE).
+# Multiple split gNBs, one CU+DU pair per node. Core on node1 (master_nodes); node2 and node3 in [ocudu_nodes], in that order.
+# node2/node3 are Docker containers on node1 (ocudu.node_containers); their IPs are the ansible_host values in hosts.ini.
+# Set core.amf.ip to node1's IP. Sequence: aether-5gc-install; aether-ocudu-nodes-up; aether-ocudu-hosts-install;
+# ocudu-router-install; aether-ocudu-split-start; aether-ocudu-uesim-start. Do not run together with the monolithic gNB.
+proxy:
+  enabled: false
+  http_proxy: ""
+  https_proxy: ""
+  no_proxy: "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.42.0.0/16,10.43.0.0/16,.svc,.svc.cluster.local,.cluster.local"
+
+airgapped:
+  enabled: false
+  allow_purge: false
+
+k8s:
+  rke2:
+    version: v1.36.4+rke2r1
+    config:
+      token: aether-k8s-rke2
+      port: 9345
+      params_file:
+        master: "deps/k8s/roles/rke2/templates/master-config.yaml"
+        worker: "deps/k8s/roles/rke2/templates/worker-config.yaml"
+
+  helm:
+    version: v3.20.0
+
+core:
+  data_iface: eth0
+  values_file: "deps/5gc/roles/core/templates/sdcore-5g-values.yaml"
+  ran_subnet: "172.28.10.0/24"    # ocudu.node_containers.network.subnet
+  helm:
+    local_charts: false      # set chart_ref to local path name if true
+    chart_ref: oci://ghcr.io/omec-project/sd-core
+    chart_version: 5.0.0
+  upf:
+    access_subnet: "192.168.252.1/24"  # access subnet & gateway
+    core_subnet: "192.168.250.1/24"  # core subnet & gateway
+    mode: af_packet      # Options: af_packet or dpdk
+    multihop_gnb: false      # set to true to override default N3 subnet
+    default_upf:
+      ip:
+        access: "192.168.252.3"
+        core:   "192.168.250.3"
+      ue_ip_pool: "192.168.100.0/24"
+  amf:
+    ip: "172.30.255.119"
+  webui:
+    service_type: NodePort
+    node_ports:
+      metrics: 30808
+      http: 30500
+      rest: 30501
+
+ocudu:
+  docker:
+    container:
+      gnb_image: aetherproject/ocudu:rel-1.0.0
+      ue_image: aetherproject/srsran-ue:rel-1.0.0
+    network:
+      name: host
+  simulation: true
+  node_containers:
+    enabled: true
+    image: aether-ocudu-node:latest
+    network:
+      name: aether-ran
+      subnet: "172.28.10.0/24"
+      gateway: "172.28.10.1"           # bridge address on node1; next hop to the UPF access network
+  servers:
+    0:
+      gnb_ip: "172.28.10.2"               # node2 container: gNB1 = CU1 + DU1 (first host in [ocudu_nodes])
+      gnb_id: 1000                       # optional; default 1000 + index
+      pci: 1                             # optional; default 1 + index
+      ue:
+        imsi: "001010100007500"          # optional; default 001010100007500 + index; provision it in the core
+      gnb_conf: gnb_zmq.yaml
+      ue_conf: ue_zmq_split.conf         # 10 MHz UE matching the split DU cell
+      cu_conf: cu_f1.yaml                # deps/ocudu/roles/gNBSplit/templates/
+      du_conf: du_f1_zmq.yaml
+      f1:
+        cu_addr: "127.0.10.1"            # loopback addresses may repeat across hosts
+        du_addr: "127.0.10.2"
+        request_pdu_session_timeout: 15  # seconds; the 3 s default is too short for the SD-Core
+      dpdk:
+        enabled: false
+    1:
+      gnb_ip: "172.28.10.3"               # node3 container: gNB2 = CU2 + DU2
+      gnb_id: 1001
+      pci: 2
+      ue:
+        imsi: "001010100007501"
+      gnb_conf: gnb_zmq.yaml
+      ue_conf: ue_zmq_split.conf
+      cu_conf: cu_f1.yaml
+      du_conf: du_f1_zmq.yaml
+      f1:
+        cu_addr: "127.0.10.1"
+        du_addr: "127.0.10.2"
+        request_pdu_session_timeout: 15
+      dpdk:
+        enabled: false
+
+amp:
+  monitor_dashboard: "deps/amp/roles/monitor-load/templates/5g-monitoring"
+
+  monitor:
+    helm:
+      chart_ref: rancher/rancher-monitoring
+      chart_version: 110.0.1+up80.9.1-rancher.19
+
+  monitor_crd:
+    helm:
+      chart_ref: rancher/rancher-monitoring-crd
+      chart_version: 110.0.1+up80.9.1-rancher.19
