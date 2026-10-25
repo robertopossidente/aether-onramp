@@ -22,6 +22,7 @@
     mode: "0644"
   become: true
   register: ocudu_exporter_unit
+  when: ansible_service_mgr == 'systemd'
 
 - name: enable and start exporter
   systemd:
@@ -30,6 +31,26 @@
     enabled: true
     daemon_reload: true
   become: true
+  when: ansible_service_mgr == 'systemd'
+
+# Node containers have no systemd: run the exporter as a detached process.
+- name: stop previous exporter without systemd
+  command: pkill -f "[o]cudu_exporter.py"
+  become: true
+  failed_when: false
+  changed_when: false
+  when: ansible_service_mgr != 'systemd'
+
+- name: start exporter without systemd
+  shell: >-
+    nohup setsid /usr/bin/python3 {{ ocudu_exporter_dir }}/ocudu_exporter.py
+    --listen {{ ocudu_exporter_bind }} --port {{ ocudu_exporter_port }}
+    --cu-container {{ ocudu_exporter_cu_container }} --du-container {{ ocudu_exporter_du_container }}
+    --du-ws-host 127.0.0.1 --du-ws-port {{ ocudu_exporter_du_ws_port }}
+    > /var/log/ocudu-exporter.log 2>&1 < /dev/null &
+  become: true
+  when: ansible_service_mgr != 'systemd'
+  changed_when: true
 
 - name: wait for exporter port
   wait_for:

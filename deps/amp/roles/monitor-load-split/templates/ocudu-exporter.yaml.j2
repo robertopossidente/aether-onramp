@@ -1,10 +1,13 @@
+{% for host in groups['ocudu_nodes'] %}
+---
 apiVersion: v1
 kind: Service
 metadata:
-  name: ocudu-exporter
+  name: ocudu-exporter-{{ host }}
   namespace: aether-5gc
   labels:
     app: ocudu-exporter
+    gnb: {{ host }}
 spec:
   clusterIP: None
   ports:
@@ -15,16 +18,18 @@ spec:
 apiVersion: v1
 kind: Endpoints
 metadata:
-  name: ocudu-exporter
+  name: ocudu-exporter-{{ host }}
   namespace: aether-5gc
   labels:
     app: ocudu-exporter
+    gnb: {{ host }}
 subsets:
   - addresses:
-      - ip: {{ split_exporter_host }}
+      - ip: {{ hostvars[host].ansible_host | default(host) }}
     ports:
       - name: metrics
         port: {{ split_exporter_port }}
+{% endfor %}
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
@@ -32,6 +37,8 @@ metadata:
   name: ocudu-exporter
   namespace: aether-5gc
 spec:
+  targetLabels:
+    - gnb
   endpoints:
     - path: /metrics
       port: metrics

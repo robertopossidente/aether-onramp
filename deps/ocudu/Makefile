@@ -17,6 +17,9 @@ ocudu-docker-install:
 		--extra-vars $(EXTRA_VARS)
 
 #### a2. Simulated nodes (node2/node3 as Docker-in-Docker containers on the master node) ####
+# Restrict split/uesim targets to one node, e.g.: make aether-ocudu-split-start OCUDU_NODE=node2
+OCUDU_LIMIT_ARG := $(if $(OCUDU_NODE),--limit $(OCUDU_NODE),)
+
 ocudu-nodes-up:
 	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/nodes.yml --tags up \
 		--extra-vars $(EXTRA_VARS)
@@ -52,17 +55,17 @@ ocudu-gnb-stop:
 
 ocudu-split-start:
 	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/gNBSplit.yml --tags start \
-		--extra-vars $(EXTRA_VARS)
+		$(OCUDU_LIMIT_ARG) --extra-vars $(EXTRA_VARS)
 ocudu-split-stop:
 	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/gNBSplit.yml --tags stop \
-		--extra-vars $(EXTRA_VARS)
+		$(OCUDU_LIMIT_ARG) --extra-vars $(EXTRA_VARS)
 
 ocudu-uesim-start:
 	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/uEsimulator.yml --tags start \
-		--extra-vars $(EXTRA_VARS)
+		$(OCUDU_LIMIT_ARG) --extra-vars $(EXTRA_VARS)
 ocudu-uesim-stop:
 	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/uEsimulator.yml --tags stop \
-		--extra-vars $(EXTRA_VARS)
+		$(OCUDU_LIMIT_ARG) --extra-vars $(EXTRA_VARS)
 
 ocudu-gnb-install: ocudu-docker-install ocudu-router-install ocudu-gnb-start
 ocudu-gnb-uninstall:  ocudu-gnb-stop ocudu-router-uninstall

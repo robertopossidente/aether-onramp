@@ -18,6 +18,7 @@
       - "{{ ocudu.docker.container.gnb_image }}"
       - "{{ ocudu.docker.container.ue_image }}"
     access_net: "{{ core.upf.access_subnet | ansible.utils.ipaddr('network/prefix') }}"
+    pod_net: "{{ nc.pod_cidr | default('10.42.0.0/16') }}"
 
   tasks:
     - name: node containers must be enabled
@@ -92,19 +93,21 @@
       loop:
         - { src: "{{ nc.network.subnet }}", dst: "{{ access_net }}" }
         - { src: "{{ access_net }}", dst: "{{ nc.network.subnet }}" }
+        - { src: "{{ pod_net }}", dst: "{{ nc.network.subnet }}" }
       become: true
       tags: [up]
 
-    - name: bypass Docker's direct-access drop for traffic from the UPF access network
+    - name: bypass Docker's direct-access drop for the UPF access network and the pod network (Prometheus scrape)
       ansible.builtin.iptables:
         table: raw
         chain: PREROUTING
-        source: "{{ access_net }}"
+        source: "{{ item }}"
         destination: "{{ nc.network.subnet }}"
         jump: ACCEPT
         action: insert
         rule_num: 1
         comment: aether-ocudu-nodes
+      loop: ["{{ access_net }}", "{{ pod_net }}"]
       become: true
       tags: [up]
 
@@ -192,6 +195,7 @@
       loop:
         - { src: "{{ nc.network.subnet }}", dst: "{{ access_net }}" }
         - { src: "{{ access_net }}", dst: "{{ nc.network.subnet }}" }
+        - { src: "{{ pod_net }}", dst: "{{ nc.network.subnet }}" }
       become: true
       tags: [down]
 
@@ -199,11 +203,12 @@
       ansible.builtin.iptables:
         table: raw
         chain: PREROUTING
-        source: "{{ access_net }}"
+        source: "{{ item }}"
         destination: "{{ nc.network.subnet }}"
         jump: ACCEPT
         comment: aether-ocudu-nodes
         state: absent
+      loop: ["{{ access_net }}", "{{ pod_net }}"]
       become: true
       tags: [down]
 
