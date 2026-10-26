@@ -21,6 +21,7 @@ if [ -f /sys/fs/cgroup/cgroup.controllers ]; then
         > /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null || :
 fi
 
+rm -f /var/run/docker.pid /var/run/docker/containerd/containerd.pid
 dockerd >/var/log/dockerd.log 2>&1 &
 DOCKERD_PID=$!
 

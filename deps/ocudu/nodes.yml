@@ -13,7 +13,13 @@
 
   vars:
     nc: "{{ ocudu.node_containers }}"
-    node_names: "{{ groups['ocudu_nodes'] }}"
+    all_node_names: "{{ groups['ocudu_nodes'] }}"
+    node_names: >-
+      {{
+        (ocudu_target_nodes.split(',') | map('trim') | reject('equalto', '') | list)
+        if (ocudu_target_nodes is defined and (ocudu_target_nodes | trim | length > 0))
+        else groups['ocudu_nodes']
+      }}
     gnb_images:
       - "{{ ocudu.docker.container.gnb_image }}"
       - "{{ ocudu.docker.container.ue_image }}"
@@ -30,7 +36,8 @@
     - name: validate node addresses
       ansible.builtin.assert:
         that:
-          - ocudu.servers | length == node_names | length
+          - ocudu.servers | length == all_node_names | length
+          - item in all_node_names
           - hostvars[item].ansible_host == ocudu.servers[idx | int].gnb_ip
           - hostvars[item].ansible_host | ansible.utils.ipaddr(nc.network.subnet) | length > 0
           - hostvars[item].ansible_host != nc.network.gateway
@@ -38,7 +45,7 @@
           {{ item }}: ansible_host must equal ocudu.servers[{{ idx }}].gnb_ip and lie inside
           {{ nc.network.subnet }} (not the gateway {{ nc.network.gateway }})
       vars:
-        idx: "{{ node_names.index(item) }}"
+        idx: "{{ all_node_names.index(item) }}"
       loop: "{{ node_names }}"
       tags: [up]
 
@@ -177,10 +184,30 @@
       become: true
       tags: [down]
 
+    - name: check remaining node containers
+      community.docker.docker_container_info:
+        name: "{{ item }}"
+      loop: "{{ all_node_names }}"
+      register: remaining_node_containers
+      become: true
+      tags: [down]
+
+    - name: set whether any node container is still present
+      ansible.builtin.set_fact:
+        any_node_container_remaining: >-
+          {{
+            (remaining_node_containers.results | default([])
+             | selectattr('exists', 'defined')
+             | selectattr('exists')
+             | list | length) > 0
+          }}
+      tags: [down]
+
     - name: remove node network
       community.docker.docker_network:
         name: "{{ nc.network.name }}"
         state: absent
+      when: not (any_node_container_remaining | default(false) | bool)
       become: true
       tags: [down]
 
@@ -196,6 +223,7 @@
         - { src: "{{ nc.network.subnet }}", dst: "{{ access_net }}" }
         - { src: "{{ access_net }}", dst: "{{ nc.network.subnet }}" }
         - { src: "{{ pod_net }}", dst: "{{ nc.network.subnet }}" }
+      when: not (any_node_container_remaining | default(false) | bool)
       become: true
       tags: [down]
 
@@ -209,6 +237,7 @@
         comment: aether-ocudu-nodes
         state: absent
       loop: ["{{ access_net }}", "{{ pod_net }}"]
+      when: not (any_node_container_remaining | default(false) | bool)
       become: true
       tags: [down]
 
@@ -221,5 +250,6 @@
         jump: RETURN
         comment: aether-ocudu-nodes
         state: absent
+      when: not (any_node_container_remaining | default(false) | bool)
       become: true
       tags: [down]

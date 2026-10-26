@@ -1,7 +1,7 @@
 ---
 
 - name: provision gNB
-  hosts: all
+  hosts: ocudu_nodes
   gather_facts: true
 
   vars_files:

@@ -44,6 +44,15 @@
     dest: /tmp/monitoring-split/5g-split-dashboard.json
     mode: "0644"
 
+- name: remove stale exporter services for inactive nodes
+  command: "kubectl delete svc,endpoints ocudu-exporter-{{ item }} -n aether-5gc --ignore-not-found"
+  loop: "{{ groups['ocudu_nodes'] }}"
+  when:
+    - ocudu_active_nodes is defined
+    - (ocudu_active_nodes | trim | length) > 0
+    - item not in (ocudu_active_nodes.split(',') | map('trim') | list)
+  changed_when: false
+
 - name: apply split monitoring resources
   command: kubectl apply -k /tmp/monitoring-split
 

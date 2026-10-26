@@ -1,4 +1,5 @@
-{% for host in groups['ocudu_nodes'] %}
+{% set active_hosts = (ocudu_active_nodes.split(',') | map('trim') | reject('equalto', '') | list) if (ocudu_active_nodes is defined and (ocudu_active_nodes | trim | length > 0)) else groups['ocudu_nodes'] %}
+{% for host in active_hosts %}
 ---
 apiVersion: v1
 kind: Service

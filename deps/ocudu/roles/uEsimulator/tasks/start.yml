@@ -43,10 +43,44 @@
   when: inventory_hostname in groups['ocudu_nodes']
   become: true
 
+- name: remove existing {{ ocudu.docker.container.ue_image }} container before starting
+  community.docker.docker_container:
+    name: "rfsim5g-nr-ue{{ instance_suffix }}"
+    state: absent
+  when: inventory_hostname in groups['ocudu_nodes']
+  become: true
+
+- name: check if split DU container is running
+  community.docker.docker_container_info:
+    name: "ocudu-du{{ instance_suffix }}"
+  register: split_du_info
+  when: inventory_hostname in groups['ocudu_nodes']
+  become: true
+
+- name: restart split DU container so ZMQ radio accepts the new UE session
+  community.docker.docker_container:
+    name: "ocudu-du{{ instance_suffix }}"
+    state: started
+    restart: true
+  when:
+    - inventory_hostname in groups['ocudu_nodes']
+    - split_du_info.exists | default(false)
+    - split_du_info.container.State.Running | default(false)
+  become: true
+
+- name: wait for split DU F1 setup after restart
+  pause:
+    seconds: 3
+  when:
+    - inventory_hostname in groups['ocudu_nodes']
+    - split_du_info.exists | default(false)
+    - split_du_info.container.State.Running | default(false)
+
 - name: create {{ ocudu.docker.container.ue_image }} containers
   community.docker.docker_container:
     name: "rfsim5g-nr-ue{{ instance_suffix }}"
     image: "{{ ocudu.docker.container.ue_image }}"
+    recreate: true
     networks:
       - name: "{{ ocudu.docker.network.name }}"
     volumes:
