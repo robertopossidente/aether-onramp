@@ -61,6 +61,16 @@ ocudu:
     network:
       name: host
   simulation: true
+  ran_tuning:
+    buffer_pool_segments: 262144
+    cu_threads: 1
+    cu_task_queue_size: 1024
+    cu_backoff_period: 500
+    cu_queue_size: 1024
+    du_threads: 2
+    du_task_queue_size: 1024
+    du_backoff_period: 500
+    du_queue_size: 1024
   node_containers:
     enabled: true
     image: aether-ocudu-node:latest

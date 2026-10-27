@@ -7,7 +7,7 @@
     "split"
   ],
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "editable": true,
   "refresh": "10s",
   "time": {
@@ -25,13 +25,14 @@
           "uid": "prometheus"
         },
         "query": {
-          "query": "label_values(ocudu_cu_up, gnb)",
+          "query": "label_values(up{job=~\"ocudu-exporter-.*\"}, gnb)",
           "refId": "gnb"
         },
-        "definition": "label_values(ocudu_cu_up, gnb)",
+        "definition": "label_values(up{job=~\"ocudu-exporter-.*\"}, gnb)",
         "refresh": 2,
         "multi": true,
         "includeAll": true,
+        "allValue": "node2|node3",
         "current": {
           "text": "All",
           "value": "$__all"
@@ -78,7 +79,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ocudu_cu_up{gnb=~\"$gnb\"}",
+          "expr": "max by (gnb) (ocudu_cu_up{gnb=~\"$gnb\"}) or (0 * max by (gnb) (up{job=~\"ocudu-exporter-.*\", gnb=~\"$gnb\"}))",
           "legendFormat": "{{gnb}}"
         }
       ],
@@ -147,7 +148,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ocudu_du_up{gnb=~\"$gnb\"}",
+          "expr": "max by (gnb) (ocudu_du_up{gnb=~\"$gnb\"}) or (0 * max by (gnb) (up{job=~\"ocudu-exporter-.*\", gnb=~\"$gnb\"}))",
           "legendFormat": "{{gnb}}"
         }
       ],
@@ -216,7 +217,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ocudu_f1_du_connected{gnb=~\"$gnb\"}",
+          "expr": "max by (gnb) (ocudu_f1_du_connected{gnb=~\"$gnb\"}) or (0 * max by (gnb) (up{job=~\"ocudu-exporter-.*\", gnb=~\"$gnb\"}))",
           "legendFormat": "{{gnb}}"
         }
       ],
@@ -285,7 +286,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "ocudu_cu_ngap_connected{gnb=~\"$gnb\"}",
+          "expr": "max by (gnb) (ocudu_cu_ngap_connected{gnb=~\"$gnb\"}) or (0 * max by (gnb) (up{job=~\"ocudu-exporter-.*\", gnb=~\"$gnb\"}))",
           "legendFormat": "{{gnb}}"
         }
       ],
@@ -354,7 +355,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (gnb) (ocudu_du_connected_ues{gnb=~\"$gnb\"})",
+          "expr": "sum by (gnb) (ocudu_du_connected_ues{gnb=~\"$gnb\"}) or (0 * max by (gnb) (up{job=~\"ocudu-exporter-.*\", gnb=~\"$gnb\"}))",
           "legendFormat": "{{gnb}}"
         }
       ],
@@ -406,7 +407,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (gnb) (ocudu_cu_ngap_pdu_sessions_setup_total{gnb=~\"$gnb\"})",
+          "expr": "sum by (gnb) (ocudu_cu_ngap_pdu_sessions_setup_total{gnb=~\"$gnb\"}) or (0 * max by (gnb) (up{job=~\"ocudu-exporter-.*\", gnb=~\"$gnb\"}))",
           "legendFormat": "{{gnb}}"
         }
       ],
@@ -458,7 +459,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (gnb) (ocudu_du_ue_dl_bitrate_bps{gnb=~\"$gnb\"})",
+          "expr": "sum by (gnb) (ocudu_du_ue_dl_bitrate_bps{gnb=~\"$gnb\"}) or (0 * max by (gnb) (up{job=~\"ocudu-exporter-.*\", gnb=~\"$gnb\"}))",
           "legendFormat": "{{gnb}} DL"
         }
       ],
@@ -496,7 +497,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (gnb) (ocudu_du_ue_ul_bitrate_bps{gnb=~\"$gnb\"})",
+          "expr": "sum by (gnb) (ocudu_du_ue_ul_bitrate_bps{gnb=~\"$gnb\"}) or (0 * max by (gnb) (up{job=~\"ocudu-exporter-.*\", gnb=~\"$gnb\"}))",
           "legendFormat": "{{gnb}} UL"
         }
       ],
@@ -542,7 +543,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "clamp_max(max(gnb_session_profile{state=\"Connected\"} or vector(0)) * min(ocudu_cu_up{gnb=~\"$gnb\"} or vector(0)) * min(ocudu_du_up{gnb=~\"$gnb\"} or vector(0)) * min(ocudu_f1_du_connected{gnb=~\"$gnb\"} or vector(0)), 1)",
+          "expr": "clamp_max((max by (gnb) (ocudu_cu_ngap_connected{gnb=~\"$gnb\"}) * on(gnb) max by (gnb) (ocudu_cu_up{gnb=~\"$gnb\"}) * on(gnb) max by (gnb) (ocudu_du_up{gnb=~\"$gnb\"}) * on(gnb) max by (gnb) (ocudu_f1_du_connected{gnb=~\"$gnb\"})) or (0 * max by (gnb) (up{job=~\"ocudu-exporter-.*\", gnb=~\"$gnb\"})), 1)",
+          "legendFormat": "{{gnb}}",
           "instant": true
         }
       ],
@@ -581,6 +583,9 @@
       },
       "options": {
         "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -605,7 +610,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "max(gnb_session_profile{state=\"Connected\"} or vector(0))",
+          "expr": "max by (gnb) (ocudu_cu_ngap_connected{gnb=~\"$gnb\"}) or (0 * max by (gnb) (up{job=~\"ocudu-exporter-.*\", gnb=~\"$gnb\"}))",
+          "legendFormat": "{{gnb}}",
           "instant": true
         }
       ],
@@ -644,6 +650,9 @@
       },
       "options": {
         "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -668,7 +677,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "min(ocudu_cu_up{gnb=~\"$gnb\"} or vector(0))",
+          "expr": "max by (gnb) (ocudu_cu_up{gnb=~\"$gnb\"}) or (0 * max by (gnb) (up{job=~\"ocudu-exporter-.*\", gnb=~\"$gnb\"}))",
+          "legendFormat": "{{gnb}}",
           "instant": true
         }
       ],
@@ -707,6 +717,9 @@
       },
       "options": {
         "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -731,7 +744,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "min(ocudu_du_up{gnb=~\"$gnb\"} or vector(0))",
+          "expr": "max by (gnb) (ocudu_du_up{gnb=~\"$gnb\"}) or (0 * max by (gnb) (up{job=~\"ocudu-exporter-.*\", gnb=~\"$gnb\"}))",
+          "legendFormat": "{{gnb}}",
           "instant": true
         }
       ],
@@ -770,6 +784,9 @@
       },
       "options": {
         "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -794,7 +811,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "min(ocudu_f1_du_connected{gnb=~\"$gnb\"} or vector(0))",
+          "expr": "max by (gnb) (ocudu_f1_du_connected{gnb=~\"$gnb\"}) or (0 * max by (gnb) (up{job=~\"ocudu-exporter-.*\", gnb=~\"$gnb\"}))",
+          "legendFormat": "{{gnb}}",
           "instant": true
         }
       ],
@@ -833,6 +851,9 @@
       },
       "options": {
         "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -857,7 +878,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "max(nf_status{nfType=\"UPF\"} or vector(0))",
+          "expr": "max(nf_status{nfType=\"UPF\"}) or vector(0)",
           "instant": true
         }
       ],
@@ -920,12 +941,31 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(ocudu_du_connected_ues{gnb=~\"$gnb\"} or vector(0))",
+          "expr": "sum by (gnb) (ocudu_du_connected_ues{gnb=~\"$gnb\"}) or (0 * max by (gnb) (up{job=~\"ocudu-exporter-.*\", gnb=~\"$gnb\"}))",
+          "legendFormat": "{{gnb}}",
           "instant": true
         }
       ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
       "options": {
-        "colorMode": "value",
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -950,12 +990,31 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "max(smf_pdu_sessions{service=\"metricfunc\"} or vector(0))",
+          "expr": "sum by (gnb) (ocudu_cu_ngap_pdu_sessions_setup_total{gnb=~\"$gnb\"}) or (0 * max by (gnb) (up{job=~\"ocudu-exporter-.*\", gnb=~\"$gnb\"}))",
+          "legendFormat": "{{gnb}}",
           "instant": true
         }
       ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
       "options": {
-        "colorMode": "value",
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -980,11 +1039,48 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "gnb_session_profile",
+          "expr": "label_replace(label_replace(label_replace(label_replace(label_replace(max by (gnb, instance) (ocudu_cu_ngap_connected{gnb=~\"$gnb\"}) or (0 * max by (gnb, instance) (up{job=~\"ocudu-exporter-.*\", gnb=~\"$gnb\"})), \"ip\", \"$1\", \"instance\", \"([^:]+):.*\"), \"gnb_id\", \"1000\", \"gnb\", \"node2\"), \"gnb_id\", \"1001\", \"gnb\", \"node3\"), \"amf_name\", \"AMF\", \"\", \"\"), \"tac\", \"000001\", \"\", \"\")",
           "instant": true,
           "format": "table"
         }
       ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "Disconnected",
+                        "color": "red"
+                      },
+                      "1": {
+                        "text": "Connected",
+                        "color": "green"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          }
+        ]
+      },
       "transformations": [
         {
           "id": "organize",
@@ -992,14 +1088,10 @@
             "excludeByName": {
               "Time": true,
               "__name__": true,
-              "job": true,
-              "endpoint": true,
-              "namespace": true,
-              "pod": true,
-              "service": true,
-              "container": true,
-              "instance": true,
-              "Value": true
+              "instance": true
+            },
+            "renameByName": {
+              "Value": "state"
             }
           }
         }
@@ -1022,26 +1114,58 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "core_subscriber",
+          "expr": "(max by (gnb, imsi, ip_addr, dnn, slice, upf) (label_replace(label_replace(core_subscriber{state=\"Connected\"}, \"gnb\", \"node2\", \"imsi\", \".*7500\"), \"gnb\", \"node3\", \"imsi\", \".*7501\")) * on(gnb) group_left() clamp_max(max by (gnb) (ocudu_du_connected_ues{gnb=~\"$gnb\"} > 0), 1)) or (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(0 * max by (gnb) (up{job=~\"ocudu-exporter-.*\", gnb=~\"$gnb\"}), \"imsi\", \"imsi-001010100007500\", \"gnb\", \"node2\"), \"imsi\", \"imsi-001010100007501\", \"gnb\", \"node3\"), \"dnn\", \"internet\", \"\", \"\"), \"slice\", \"sd:010203 sst:1\", \"\", \"\"), \"ip_addr\", \"-\", \"\", \"\"), \"upf\", \"-\", \"\", \"\") unless on(gnb) (max by (gnb) (ocudu_du_connected_ues{gnb=~\"$gnb\"} > 0)))",
           "instant": true,
           "format": "table"
         }
       ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "Disconnected",
+                        "color": "red"
+                      },
+                      "1": {
+                        "text": "Connected",
+                        "color": "green"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          }
+        ]
+      },
       "transformations": [
         {
           "id": "organize",
           "options": {
             "excludeByName": {
               "Time": true,
-              "__name__": true,
-              "job": true,
-              "endpoint": true,
-              "namespace": true,
-              "pod": true,
-              "service": true,
-              "container": true,
-              "instance": true,
-              "Value": true
+              "__name__": true
+            },
+            "renameByName": {
+              "Value": "state"
             }
           }
         }
@@ -1406,25 +1530,25 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "ocudu_du_ue_dl_bitrate_bps{gnb=~\"$gnb\"}",
+          "expr": "label_join(max by (gnb, pci, ue, rnti) (ocudu_du_ue_dl_bitrate_bps{gnb=~\"$gnb\"}), \"gnb_ue\", \"/\", \"gnb\", \"rnti\")",
           "instant": true,
           "format": "table"
         },
         {
           "refId": "B",
-          "expr": "ocudu_du_ue_ul_bitrate_bps{gnb=~\"$gnb\"}",
+          "expr": "label_join(max by (gnb, pci, ue, rnti) (ocudu_du_ue_ul_bitrate_bps{gnb=~\"$gnb\"}), \"gnb_ue\", \"/\", \"gnb\", \"rnti\")",
           "instant": true,
           "format": "table"
         },
         {
           "refId": "C",
-          "expr": "ocudu_du_ue_cqi{gnb=~\"$gnb\"}",
+          "expr": "label_join(max by (gnb, pci, ue, rnti) (ocudu_du_ue_cqi{gnb=~\"$gnb\"}), \"gnb_ue\", \"/\", \"gnb\", \"rnti\")",
           "instant": true,
           "format": "table"
         },
         {
           "refId": "D",
-          "expr": "ocudu_du_ue_pusch_snr_db{gnb=~\"$gnb\"}",
+          "expr": "label_join(max by (gnb, pci, ue, rnti) (ocudu_du_ue_pusch_snr_db{gnb=~\"$gnb\"}), \"gnb_ue\", \"/\", \"gnb\", \"rnti\")",
           "instant": true,
           "format": "table"
         }
@@ -1433,7 +1557,7 @@
         {
           "id": "joinByField",
           "options": {
-            "byField": "rnti",
+            "byField": "gnb_ue",
             "mode": "outer"
           }
         },
@@ -1442,9 +1566,26 @@
           "options": {
             "excludeByName": {
               "Time": true,
-              "__name__": true
+              "__name__": true,
+              "gnb_ue": true,
+              "gnb 2": true,
+              "gnb 3": true,
+              "gnb 4": true,
+              "pci 2": true,
+              "pci 3": true,
+              "pci 4": true,
+              "ue 2": true,
+              "ue 3": true,
+              "ue 4": true,
+              "rnti 2": true,
+              "rnti 3": true,
+              "rnti 4": true
             },
             "renameByName": {
+              "gnb 1": "gnb",
+              "pci 1": "pci",
+              "ue 1": "ue",
+              "rnti 1": "rnti",
               "Value #A": "DL bps",
               "Value #B": "UL bps",
               "Value #C": "CQI",

@@ -47,3 +47,17 @@ metrics:
 pcap:
   ngap_enable: false
   f1ap_enable: false
+
+buffer_pool:
+  nof_segments: {{ (ocudu.ran_tuning | default({})).buffer_pool_segments | default(262144) }}
+
+expert_execution:
+  threads:
+    main_pool:
+      nof_threads: {{ (ocudu.ran_tuning | default({})).cu_threads | default(1) }}
+      task_queue_size: {{ (ocudu.ran_tuning | default({})).cu_task_queue_size | default(1024) }}
+      backoff_period: {{ (ocudu.ran_tuning | default({})).cu_backoff_period | default(500) }}
+  queues:
+    cu_up_dl_ue_executor_queue_size: {{ (ocudu.ran_tuning | default({})).cu_queue_size | default(1024) }}
+    cu_up_ul_ue_executor_queue_size: {{ (ocudu.ran_tuning | default({})).cu_queue_size | default(1024) }}
+    cu_up_ctrl_ue_executor_queue_size: {{ (ocudu.ran_tuning | default({})).cu_queue_size | default(1024) }}
