@@ -71,6 +71,7 @@ ocudu:
     du_task_queue_size: 1024
     du_backoff_period: 500
     du_queue_size: 1024
+    ue_phy_threads: 1
   node_containers:
     enabled: true
     image: aether-ocudu-node:latest

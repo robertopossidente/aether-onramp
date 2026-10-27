@@ -117,9 +117,8 @@
     volumes:
       - "/tmp/ocudu_cu{{ instance_suffix }}.yaml:/opt/cu_config.yaml"
     capabilities:
-      - SYS_NICE
       - IPC_LOCK
-    privileged: true
+    privileged: false
     restart_policy: unless-stopped
     state: started
     detach: true
@@ -143,9 +142,8 @@
     volumes:
       - "/tmp/ocudu_du{{ instance_suffix }}.yaml:/opt/du_config.yaml"
     capabilities:
-      - SYS_NICE
       - IPC_LOCK
-    privileged: true
+    privileged: false
     restart_policy: unless-stopped
     state: started
     detach: true

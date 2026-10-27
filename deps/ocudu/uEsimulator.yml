@@ -2,6 +2,7 @@
 
 - name: provision uEsimulator
   hosts: ocudu_nodes
+  serial: 1
   gather_facts: true
 
   vars_files:

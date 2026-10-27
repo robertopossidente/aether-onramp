@@ -87,10 +87,11 @@
       - /tmp/ue_zmq{{ instance_suffix }}.conf:/opt/ue_zmq.conf
     devices:
       - /dev/net/tun:/dev/net/tun
-    privileged: true
+    privileged: false
     capabilities:
-    - NET_ADMIN
-    - NET_RAW
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_ADMIN
     restart_policy: unless-stopped
     state: started
     detach: true
