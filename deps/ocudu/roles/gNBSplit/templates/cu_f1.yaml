@@ -9,7 +9,12 @@ cu_cp:
         plmn_list:
           - plmn: "00101"
             tai_slice_support_list:
-              - sst: 1
+{% for slice_item in (tai_slice_support_list | default([{'sst': 1}])) %}
+              - sst: {{ slice_item.sst }}
+{% if slice_item.sd is defined %}
+                sd: {{ slice_item.sd }}
+{% endif %}
+{% endfor %}
   inactivity_timer: 7200
   # The SD-Core needs more than the 3 s default to answer the PDU session request
   request_pdu_session_timeout: {{ request_pdu_session_timeout }}

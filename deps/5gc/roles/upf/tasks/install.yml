@@ -123,7 +123,7 @@
   file:
     path: "/tmp/upf-{{ item.key }}.yaml"
     state: absent
-  with_dict: "{{ core.upf.additional_upfs}}"
+  with_dict: "{{ core.upf.additional_upfs | default({}) }}"
   when: inventory_hostname in groups['master_nodes']
 
 - name: copy config files to gnbsim host
@@ -137,7 +137,8 @@
     upf_access_ip: "{{ item.value.ip.access + '/' + (core.upf.access_subnet | split('/') | last) }}"
     upf_core_ip: "{{ item.value.ip.core + '/' + (core.upf.core_subnet | split('/') | last) }}"
     upf_ue_ip_pool: "{{ item.value.ue_ip_pool }}"
-  with_dict: "{{ core.upf.additional_upfs}}"
+    upf_hostname: "{{ item.value.hostname | default('upf') }}"
+  with_dict: "{{ core.upf.additional_upfs | default({}) }}"
   when: inventory_hostname in groups['master_nodes']
 
 - name: update helm dependencies
@@ -147,11 +148,11 @@
       - dep
       - up
       - "{{ core.upf.helm.chart_ref }}"
-  when: inventory_hostname in groups['master_nodes'] and core.upf.helm.local_charts
+  when: inventory_hostname in groups['master_nodes'] and core.upf.helm is defined and core.upf.helm.local_charts
 
 - set_fact:
     upf_helm_requires_repo_update: "{{ (not core.upf.helm.local_charts) and not (core.upf.helm.chart_ref is match('^oci://')) }}"
-  when: inventory_hostname in groups['master_nodes']
+  when: inventory_hostname in groups['master_nodes'] and core.upf.helm is defined
 
 - name: deploy upf
   kubernetes.core.helm:
@@ -166,7 +167,7 @@
     wait: true
     wait_timeout: "1m30s"
     force: true
-  with_dict: "{{ core.upf.additional_upfs}}"
+  with_dict: "{{ core.upf.additional_upfs | default({}) }}"
   when: inventory_hostname in groups['master_nodes']
 
 - name: configure route for upf traffic on gnbsim node
@@ -174,12 +175,12 @@
     argv:
       - ip
       - route
-      - add
+      - replace
       - "{{ item.value.ue_ip_pool }}"
       - via
       - "{{ item.value.ip.core }}"
   when: inventory_hostname in groups['master_nodes']
-  with_dict: "{{ core.upf.additional_upfs}}"
+  with_dict: "{{ core.upf.additional_upfs | default({}) }}"
   become: true
   # ignore_errors: yes
 
@@ -191,6 +192,6 @@
     out_interface: "{{ core.data_iface }}"
     jump: MASQUERADE
   when: inventory_hostname in groups['master_nodes']
-  with_dict: "{{ core.upf.additional_upfs}}"
+  with_dict: "{{ core.upf.additional_upfs | default({}) }}"
   become: true
   # ignore_errors: yes

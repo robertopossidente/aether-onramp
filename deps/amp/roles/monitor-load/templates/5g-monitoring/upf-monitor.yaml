@@ -11,9 +11,17 @@ spec:
   endpoints:
     - path: /metrics
       port: prometheus-exporter
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_namespace]
+          regex: "aether-5gc"
+          targetLabel: upf
+          replacement: "aether-upf-0"
+        - sourceLabels: [__meta_kubernetes_namespace]
+          regex: "(aether-upf-.*)"
+          targetLabel: upf
+          replacement: "$1"
   namespaceSelector:
-    matchNames:
-      - aether-5gc
+    any: true
   selector:
     matchLabels:
       app: upf

@@ -60,6 +60,16 @@ blueprints include:
   other. Use `cp vars/main-ocudu-split.yml vars/main.yml` or pass
   `EXTRA_VARS='"@vars/main-ocudu-split.yml"'`.
 
+* `main-ocudu-split-multi.yml`: Configures multiple split OCUDU gNBs (one
+  O-CU + O-DU + simulated UE stack per node in `[ocudu_nodes]`) sharing a
+  single UPF and slice.
+
+* `main-ocudu-split-multi-mocn.yml`: Same multi-node split OCUDU RAN topology
+  as `main-ocudu-split-multi.yml`, configured for MOCN / Neutral Host
+  multi-UPF routing where each subscriber group (IMSI) is dynamically anchored
+  to a distinct network slice and dedicated UPF (`default_upf` in `aether-5gc`
+  and `additional_upfs["1"]` in `aether-upf-1`).
+
 * `main-n3iwf.yml`: Configures the SD-Core with a N3IWF entity for non-3GPP access.
   Details documented
   [here](https://docs.aetherproject.org/onramp/blueprints.html#non-3gpp-interworking-function).

@@ -183,12 +183,18 @@ omec-sub-provision:
               op: ""
               key: "5122250214c33e723a5dd523fc145fc0"
               sequenceNumber: "16f3b3f70fc2"
+{% set mocn_enabled = (core.get('mocn', {}).get('enabled', false) | bool) %}
+{% set mocn_slices = core.get('mocn', {}).get('slices', []) if mocn_enabled else [] %}
+{% set mocn_imsis = mocn_slices | map(attribute='imsis') | select('defined') | sum(start=[]) %}
+{% set mocn_msisdns = mocn_slices | map(attribute='msisdns') | select('defined') | sum(start=[]) %}
             # Configure Device Groups
             device-groups:
             - name:  "user-group1"
               imsis:
                 - "001010100007500"
+{% if "001010100007501" not in mocn_imsis %}
                 - "001010100007501"
+{% endif %}
                 - "001010100007502"
                 - "001010100007503"
                 - "001010100007504"
@@ -289,7 +295,9 @@ omec-sub-provision:
                 - "001010100007599"
               msisdns:
                 - "msisdn-9000000001"
+{% if "msisdn-9000000002" not in mocn_msisdns %}
                 - "msisdn-9000000002"
+{% endif %}
                 - "msisdn-9000000003"
                 - "msisdn-9000000004"
                 - "msisdn-9000000005"
@@ -405,6 +413,35 @@ omec-sub-provision:
                       pdb: 300
                       pelr: 6
               site-info: "enterprise"
+{% for mslice in mocn_slices %}
+{% set mupf = (core.upf.additional_upfs | default({})).get(mslice.upf_key | string, {}) %}
+            - name:  "{{ mslice.device_group | default('user-group-' ~ (mslice.upf_key | string)) }}"
+              imsis:
+{% for mimsi in (mslice.imsis | default([])) %}
+                - "{{ mimsi }}"
+{% endfor %}
+              msisdns:
+{% for mmsisdn in (mslice.msisdns | default(['msisdn-9000000002'])) %}
+                - "{{ mmsisdn }}"
+{% endfor %}
+              ip-domain-name: "{{ mslice.pool_name | default('pool-' ~ (mslice.upf_key | string)) }}"
+              ip-domains:
+                - dnn: {{ mslice.dnn | default('internet') }}
+                  dns-primary: "8.8.8.8"
+                  mtu: 1460
+                  ue-ip-pool: {{ mslice.ue_ip_pool | default(mupf.ue_ip_pool) }}
+                  ue-dnn-qos:
+                    dnn-mbr-downlink: 1000
+                    dnn-mbr-uplink:   1000
+                    bitrate-unit: Mbps
+                    traffic-class:
+                      name: "platinum"
+                      qci: 9
+                      arp: 6
+                      pdb: 300
+                      pelr: 6
+              site-info: "enterprise"
+{% endfor %}
             # UPF allocates IP address if there is only 1 device-group
             # SMF allocates IP address if there is >1 device-group
 
@@ -440,6 +477,36 @@ omec-sub-provision:
                 upf:
                   upf-name: "upf"  # associated UPF for this slice. One UPF per Slice.
                   upf-port: 8805
+{% for mslice in mocn_slices %}
+{% set mupf = (core.upf.additional_upfs | default({})).get(mslice.upf_key | string, {}) %}
+            - name: "{{ mslice.name | default('slice-upf-' ~ (mslice.upf_key | string)) }}"
+              slice-id:
+                sd: "{{ mslice.sd | default('010204') }}"
+                sst: {{ mslice.sst | default(1) }}
+              site-device-group:
+              - "{{ mslice.device_group | default('user-group-' ~ (mslice.upf_key | string)) }}"
+              application-filtering-rules:
+              - rule-name: "ALLOW-ALL"
+                priority: 250
+                action: "permit"
+                endpoint: "0.0.0.0/0"
+                traffic-class:
+                  qci: 9
+                  arp: 6
+              site-info:
+                gNodeBs:
+                - name: "gnb1"
+                  tac: 1
+                - name: "gnb2"
+                  tac: 2
+                plmn:
+                  mcc: "001"
+                  mnc: "01"
+                site-name: "enterprise"
+                upf:
+                  upf-name: "{{ mslice.upf_name | default(mupf.hostname | default('upf.aether-upf-' ~ (mslice.upf_key | string))) }}"
+                  upf-port: {{ mslice.upf_port | default(8805) }}
+{% endfor %}
 
 # Override values for omec-user-plane Helm Chart
 # https://github.com/omec-project/sdcore-helm-charts/blob/main/bess-upf/values.yaml

@@ -101,21 +101,31 @@
 - name: wait for UE tunnel interface
   community.docker.docker_container_exec:
     container: "rfsim5g-nr-ue{{ instance_suffix }}"
-    command: "ip netns exec ue1 ip link show tun_srsue"
+    command: "ip netns exec ue1 ip -4 -o addr show dev tun_srsue"
   register: ocudu_ue_tunnel
   retries: 60
   delay: 2
-  until: ocudu_ue_tunnel.rc == 0
+  until: ocudu_ue_tunnel.rc == 0 and (ocudu_ue_tunnel.stdout | default('') | trim | length > 0)
   changed_when: false
   when: inventory_hostname in groups['ocudu_nodes']
   become: true
+
+- name: resolve UE default gateway from assigned tunnel address or configured pool
+  ansible.builtin.set_fact:
+    ue_assigned_cidr: >-
+      {{
+        (ocudu_ue_tunnel.stdout | default('') | regex_search('inet ([0-9.]+/[0-9]+)', '\1') | first)
+        if (ocudu_ue_tunnel.stdout | default('') is search('inet [0-9.]+/[0-9]+'))
+        else ((ocudu.servers[groups['ocudu_nodes'].index(inventory_hostname)].ue | default({})).ue_ip_pool | default(core.upf.default_upf.ue_ip_pool))
+      }}
+  when: inventory_hostname in groups['ocudu_nodes']
 
 - name: add default route for UE
   community.docker.docker_container_exec:
     container: "rfsim5g-nr-ue{{ instance_suffix }}"
     command: >-
       ip netns exec ue1 ip route replace default via
-      {{ (core.upf.default_upf.ue_ip_pool.split('.'))[:3] | join('.') }}.{{ (core.upf.default_upf.ue_ip_pool.split('.')[3] | int) + 1 }}
+      {{ (ue_assigned_cidr.split('.'))[:3] | join('.') }}.1
       dev tun_srsue
   when: inventory_hostname in groups['ocudu_nodes']
   become: true

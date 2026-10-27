@@ -88,6 +88,7 @@
     f1: "{{ ocudu.servers[server_index | int].f1 | default({}) }}"
     cu_f1_addr: "{{ (ocudu.servers[server_index | int].f1 | default({})).cu_addr | default('127.0.10.1') }}"
     request_pdu_session_timeout: "{{ (ocudu.servers[server_index | int].f1 | default({})).request_pdu_session_timeout | default(15) }}"
+    tai_slice_support_list: "{{ ocudu.servers[server_index | int].tai_slice_support_list | default([{'sst': 1}]) }}"
   register: cu_config
   when: inventory_hostname in groups['ocudu_nodes']
   become: true

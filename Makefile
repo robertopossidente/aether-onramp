@@ -91,6 +91,10 @@ aether-uninstall: amp-uninstall gnbsim-uninstall 5gc-uninstall k8s-uninstall
 aether-ocudu-split-multi-install: k8s-install 5gc-install aether-webui-gui-start amp-install aether-ocudu-split-install
 aether-ocudu-split-multi-uninstall: aether-ocudu-split-uninstall amp-uninstall aether-webui-gui-stop 5gc-uninstall k8s-uninstall
 
+#### Shortcut for OCUDU Split Multi-Node MOCN (Multiple UPFs) ####
+aether-ocudu-split-multi-mocn-install: k8s-install 5gc-install aether-add-upfs aether-webui-gui-start amp-install aether-ocudu-split-install
+aether-ocudu-split-multi-mocn-uninstall: aether-ocudu-split-uninstall amp-uninstall aether-webui-gui-stop aether-remove-upfs 5gc-uninstall k8s-uninstall
+
 #### Provision AETHER for 4G ####
 #### 4G/5G share router role ####
 aether-4gc-install: 4gc-core-install 5gc-router-install

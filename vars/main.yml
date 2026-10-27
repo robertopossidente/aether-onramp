@@ -1,8 +1,12 @@
-# OCUDU split profile (O-CU + O-DU over F1, ZMQ radio, simulated UE).
-# Multiple split gNBs, one CU+DU pair per node. Core on node1 (master_nodes); node2 and node3 in [ocudu_nodes], in that order.
-# node2/node3 are Docker containers on node1 (ocudu.node_containers); their IPs are the ansible_host values in hosts.ini.
-# Set core.amf.ip to node1's IP. Sequence: aether-5gc-install; aether-ocudu-nodes-up; aether-ocudu-hosts-install;
-# ocudu-router-install; aether-ocudu-split-start; aether-ocudu-uesim-start. Do not run together with the monolithic gNB.
+# OCUDU split profile (O-CU + O-DU over F1, ZMQ radio, simulated UE) - MOCN Multi-UPF flavor.
+# Shared RAN (MOCN / Neutral Host) with IMSI/subscription-based Multi-UPF routing:
+# - Multiple split gNBs, one CU+DU pair per node (node2 and node3 in [ocudu_nodes]).
+# - Core on node1 (master_nodes) with two UPFs:
+#     * default_upf (ns: aether-5gc)   -> slice "default"     (sst: 1, sd: 010203) -> user-group1 (IMSI 001010100007500, pool 192.168.100.0/24)
+#     * additional_upfs["1"] (aether-upf-1) -> slice "slice-upf-1" (sst: 1, sd: 010204) -> user-group2 (IMSI 001010100007501, pool 192.168.101.0/24)
+# Set core.amf.ip to node1's IP. Sequence: aether-5gc-install; aether-add-upfs; aether-ocudu-nodes-up;
+# aether-ocudu-hosts-install; ocudu-router-install; aether-ocudu-split-start; aether-ocudu-uesim-start
+# (or shortcut: make aether-ocudu-split-multi-mocn-install). Do not run together with the monolithic gNB.
 proxy:
   enabled: false
   http_proxy: ""
@@ -39,11 +43,42 @@ core:
     core_subnet: "192.168.250.1/24"  # core subnet & gateway
     mode: af_packet      # Options: af_packet or dpdk
     multihop_gnb: false      # set to true to override default N3 subnet
+    helm:
+      local_charts: false
+      chart_ref: oci://ghcr.io/omec-project/bess-upf
+      chart_version: 2.0.0
+    values_file: "deps/5gc/roles/upf/templates/upf-5g-values.yaml"
     default_upf:
       ip:
         access: "192.168.252.3"
         core:   "192.168.250.3"
       ue_ip_pool: "192.168.100.0/24"
+    additional_upfs:
+      "1":
+        hostname: "upf.aether-upf-1"
+        ip:
+          access: "192.168.252.6"
+          core:   "192.168.250.6"
+        ue_ip_pool: "192.168.101.0/24"
+      # "2":
+      #   hostname: "upf.aether-upf-2"
+      #   ip:
+      #     access: "192.168.252.7"
+      #     core:   "192.168.250.7"
+      #   ue_ip_pool: "192.168.102.0/24"
+  mocn:
+    enabled: true
+    slices:
+      - name: "slice-upf-1"
+        sst: 1
+        sd: "010204"
+        upf_key: "1"
+        device_group: "user-group2"
+        pool_name: "pool2"
+        imsis:
+          - "001010100007501"
+        msisdns:
+          - "msisdn-9000000002"
   amf:
     ip: "172.30.255.119"
   webui:
@@ -85,7 +120,8 @@ ocudu:
       gnb_id: 1000                       # optional; default 1000 + index
       pci: 1                             # optional; default 1 + index
       ue:
-        imsi: "001010100007500"          # optional; default 001010100007500 + index; provision it in the core
+        imsi: "001010100007500"          # Tenant 1 (user-group1 -> slice "default" -> default_upf 192.168.100.0/24)
+        ue_ip_pool: "192.168.100.0/24"
       gnb_conf: gnb_zmq.yaml
       ue_conf: ue_zmq_split.conf         # 10 MHz UE matching the split DU cell
       cu_conf: cu_f1.yaml                # deps/ocudu/roles/gNBSplit/templates/
@@ -101,7 +137,8 @@ ocudu:
       gnb_id: 1001
       pci: 2
       ue:
-        imsi: "001010100007501"
+        imsi: "001010100007501"          # Tenant 2 (user-group2 -> slice "slice-upf-1" -> aether-upf-1 192.168.101.0/24)
+        ue_ip_pool: "192.168.101.0/24"
       gnb_conf: gnb_zmq.yaml
       ue_conf: ue_zmq_split.conf
       cu_conf: cu_f1.yaml
@@ -125,3 +162,4 @@ amp:
     helm:
       chart_ref: rancher/rancher-monitoring-crd
       chart_version: 110.0.1+up80.9.1-rancher.19
+

@@ -38,6 +38,29 @@
           "value": "$__all"
         },
         "sort": 1
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(up{job=\"upf-http\"}, upf)",
+        "includeAll": true,
+        "label": "UPF",
+        "multi": true,
+        "name": "upf",
+        "query": {
+          "query": "label_values(up{job=\"upf-http\"}, upf)",
+          "refId": "upf"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
       }
     ]
   },
@@ -878,7 +901,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "max(nf_status{nfType=\"UPF\"}) or vector(0)",
+          "expr": "max by (upf) (up{job=\"upf-http\", upf=~\"$upf\"})",
+          "legendFormat": "{{upf}}",
           "instant": true
         }
       ],
@@ -911,7 +935,8 @@
                 "value": 1
               }
             ]
-          }
+          },
+          "displayName": "${__field.labels.upf}"
         },
         "overrides": []
       },
@@ -1114,7 +1139,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "(max by (gnb, imsi, ip_addr, dnn, slice, upf) (label_replace(label_replace(core_subscriber{state=\"Connected\"}, \"gnb\", \"node2\", \"imsi\", \".*7500\"), \"gnb\", \"node3\", \"imsi\", \".*7501\")) * on(gnb) group_left() clamp_max(max by (gnb) (ocudu_du_connected_ues{gnb=~\"$gnb\"} > 0), 1)) or (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(0 * max by (gnb) (up{job=~\"ocudu-exporter-.*\", gnb=~\"$gnb\"}), \"imsi\", \"imsi-001010100007500\", \"gnb\", \"node2\"), \"imsi\", \"imsi-001010100007501\", \"gnb\", \"node3\"), \"dnn\", \"internet\", \"\", \"\"), \"slice\", \"sd:010203 sst:1\", \"\", \"\"), \"ip_addr\", \"-\", \"\", \"\"), \"upf\", \"-\", \"\", \"\") unless on(gnb) (max by (gnb) (ocudu_du_connected_ues{gnb=~\"$gnb\"} > 0)))",
+          "expr": "(max by (gnb, imsi, ip_addr, dnn, slice, upf) (label_replace(label_replace(label_replace(label_replace(label_replace(core_subscriber{state=\"Connected\"}, \"gnb\", \"node2\", \"imsi\", \".*7500\"), \"gnb\", \"node3\", \"imsi\", \".*7501\"), \"upf\", \"aether-upf-0\", \"upf\", \"upf\"), \"upf\", \"aether-upf-0\", \"slice\", \".*010203.*\"), \"upf\", \"aether-upf-1\", \"slice\", \".*010204.*\")) * on(gnb) group_left() clamp_max(max by (gnb) (ocudu_du_connected_ues{gnb=~\"$gnb\"} > 0), 1)) or (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(0 * max by (gnb) (up{job=~\"ocudu-exporter-.*\", gnb=~\"$gnb\"}), \"imsi\", \"imsi-001010100007500\", \"gnb\", \"node2\"), \"imsi\", \"imsi-001010100007501\", \"gnb\", \"node3\"), \"dnn\", \"internet\", \"\", \"\"), \"slice\", \"sd:010203 sst:1\", \"\", \"\"), \"ip_addr\", \"-\", \"\", \"\"), \"upf\", \"-\", \"\", \"\") unless on(gnb) (max by (gnb) (ocudu_du_connected_ues{gnb=~\"$gnb\"} > 0)))",
           "instant": true,
           "format": "table"
         }
@@ -1206,8 +1231,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (iface, dir) (rate(upf_bytes_count[1m])) * 8",
-          "legendFormat": "{{iface}} {{dir}}"
+          "expr": "sum by (upf, iface, dir) (rate(upf_bytes_count{upf=~\"$upf\"}[1m])) * 8",
+          "legendFormat": "{{upf}} {{iface}} {{dir}}"
         }
       ]
     },
@@ -1234,13 +1259,13 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (iface, dir) (rate(upf_packets_count[1m]))",
-          "legendFormat": "pkts {{iface}} {{dir}}"
+          "expr": "sum by (upf, iface, dir) (rate(upf_packets_count{upf=~\"$upf\"}[1m]))",
+          "legendFormat": "pkts {{upf}} {{iface}} {{dir}}"
         },
         {
           "refId": "B",
-          "expr": "sum by (iface, dir) (rate(upf_dropped_count[1m]))",
-          "legendFormat": "drop {{iface}} {{dir}}"
+          "expr": "sum by (upf, iface, dir) (rate(upf_dropped_count{upf=~\"$upf\"}[1m]))",
+          "legendFormat": "drop {{upf}} {{iface}} {{dir}}"
         }
       ]
     },
@@ -1267,13 +1292,13 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (iface) (rate(upf_latency_ns_sum[1m])) / sum by (iface) (rate(upf_latency_ns_count[1m])) / 1e6",
-          "legendFormat": "latência {{iface}}"
+          "expr": "sum by (upf, iface) (rate(upf_latency_ns_sum{upf=~\"$upf\"}[1m])) / sum by (upf, iface) (rate(upf_latency_ns_count{upf=~\"$upf\"}[1m])) / 1e6",
+          "legendFormat": "latência {{upf}} {{iface}}"
         },
         {
           "refId": "B",
-          "expr": "sum by (iface) (rate(upf_jitter_ns_sum[1m])) / sum by (iface) (rate(upf_jitter_ns_count[1m])) / 1e6",
-          "legendFormat": "jitter {{iface}}"
+          "expr": "sum by (upf, iface) (rate(upf_jitter_ns_sum{upf=~\"$upf\"}[1m])) / sum by (upf, iface) (rate(upf_jitter_ns_count{upf=~\"$upf\"}[1m])) / 1e6",
+          "legendFormat": "jitter {{upf}} {{iface}}"
         }
       ]
     },
@@ -1294,8 +1319,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (message_type, direction) (rate(pfcp_messages_duration_seconds_count[5m]))",
-          "legendFormat": "{{message_type}} {{direction}}"
+          "expr": "sum by (upf, message_type, direction) (rate(pfcp_messages_duration_seconds_count{upf=~\"$upf\"}[5m]))",
+          "legendFormat": "{{upf}} {{message_type}} {{direction}}"
         }
       ]
     },
@@ -1316,8 +1341,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "max(smf_pdu_sessions{service=\"metricfunc\"})",
-          "legendFormat": "sessões"
+          "expr": "max by (upf) (label_replace(label_replace(label_replace(smf_pdu_sessions{service=\"metricfunc\"}, \"upf\", \"aether-upf-0\", \"upf\", \"upf\"), \"upf\", \"aether-upf-0\", \"slice\", \".*010203.*\"), \"upf\", \"aether-upf-1\", \"slice\", \".*010204.*\")) * on(upf) group_left() (up{job=\"upf-http\", upf=~\"$upf\"} * 0 + 1)",
+          "legendFormat": "sessões {{upf}}"
         }
       ]
     },

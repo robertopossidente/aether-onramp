@@ -10,7 +10,20 @@
       - via
       - "{{ item.value.ip.core }}"
   when: inventory_hostname in groups['master_nodes']
-  with_dict: "{{ core.upf.additional_upfs}}"
+  with_dict: "{{ core.upf.additional_upfs | default({}) }}"
+  become: true
+  ignore_errors: yes
+
+- name: remove NAT for upf traffic
+  iptables:
+    table: nat
+    chain: POSTROUTING
+    source: "{{ item.value.ue_ip_pool }}"
+    out_interface: "{{ core.data_iface }}"
+    jump: MASQUERADE
+    state: absent
+  when: inventory_hostname in groups['master_nodes'] and core.data_iface is defined and core.data_iface != ''
+  with_dict: "{{ core.upf.additional_upfs | default({}) }}"
   become: true
   ignore_errors: yes
 
@@ -35,7 +48,7 @@
     release_namespace: aether-upf-{{ item.key }}
     state: absent
     wait: true
-  with_dict: "{{ core.upf.additional_upfs}}"
+  with_dict: "{{ core.upf.additional_upfs | default({}) }}"
   when: inventory_hostname in groups['master_nodes']
   ignore_errors: yes
 
@@ -46,7 +59,7 @@
       - delete
       - namespace
       - "aether-upf-{{ item.key }}"
-  with_dict: "{{ core.upf.additional_upfs}}"
+  with_dict: "{{ core.upf.additional_upfs | default({}) }}"
   when: inventory_hostname in groups['master_nodes']
   ignore_errors: yes
 
