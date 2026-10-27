@@ -1,7 +1,7 @@
 ---
 
 - name: provision upf
-  hosts: all
+  hosts: master_nodes
   gather_facts: true
 
   vars_files:

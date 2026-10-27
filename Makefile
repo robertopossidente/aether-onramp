@@ -76,6 +76,8 @@ aether-ocudu-split-start: ocudu-split-start
 aether-ocudu-split-stop: ocudu-split-stop
 aether-ocudu-uesim-start: ocudu-uesim-start
 aether-ocudu-uesim-stop: ocudu-uesim-stop
+aether-ocudu-split-install: ocudu-split-install amp-split-exporter-install amp-split-monitor-load
+aether-ocudu-split-uninstall: amp-split-exporter-uninstall ocudu-split-uninstall amp-split-monitor-cleanup
 aether-oscric-ric-install: oscric-ric-install
 aether-oscric-ric-uninstall: oscric-ric-uninstall
 aether-n3iwf-install: n3iwf-install
@@ -84,6 +86,10 @@ aether-n3iwf-uninstall: n3iwf-uninstall
 #### Shortcut for QuickStart Only ####
 aether-install: k8s-install 5gc-install gnbsim-install amp-install
 aether-uninstall: amp-uninstall gnbsim-uninstall 5gc-uninstall k8s-uninstall
+
+#### Shortcut for OCUDU Split Multi-Node (supports OCUDU_NODE=node2, node3, or both) ####
+aether-ocudu-split-multi-install: k8s-install 5gc-install aether-webui-gui-start amp-install aether-ocudu-split-install
+aether-ocudu-split-multi-uninstall: aether-ocudu-split-uninstall amp-uninstall aether-webui-gui-stop 5gc-uninstall k8s-uninstall
 
 #### Provision AETHER for 4G ####
 #### 4G/5G share router role ####

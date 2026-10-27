@@ -32,14 +32,25 @@ amp-split-exporter-install:
 	ansible-playbook -i $(HOSTS_INI_FILE) $(AMP_ROOT_DIR)/split.yml --tags install --limit $(AMP_SPLIT_LIMIT) \
 		--extra-vars "ROOT_DIR=$(ROOT_DIR)" --extra-vars $(EXTRA_VARS)
 amp-split-exporter-uninstall:
-	ansible-playbook -i $(HOSTS_INI_FILE) $(AMP_ROOT_DIR)/split.yml --tags uninstall --limit $(AMP_SPLIT_LIMIT) \
-		--extra-vars "ROOT_DIR=$(ROOT_DIR)" --extra-vars $(EXTRA_VARS)
+	@if [ -n "$(OCUDU_STOP_NODES)" ]; then \
+		ansible-playbook -i $(HOSTS_INI_FILE) $(AMP_ROOT_DIR)/split.yml --tags uninstall --limit $(OCUDU_STOP_NODES) \
+			--extra-vars "ROOT_DIR=$(ROOT_DIR)" --extra-vars $(EXTRA_VARS); \
+	else \
+		echo "Skipping amp-split-exporter-uninstall: no running target OCUDU node containers"; \
+	fi
 amp-split-monitor-load:
 	ansible-playbook -i $(HOSTS_INI_FILE) $(AMP_ROOT_DIR)/split.yml --tags install --limit master_nodes \
 		$(AMP_SPLIT_ACTIVE_ARG) --extra-vars "ROOT_DIR=$(ROOT_DIR)" --extra-vars $(EXTRA_VARS)
 amp-split-monitor-uninstall:
 	ansible-playbook -i $(HOSTS_INI_FILE) $(AMP_ROOT_DIR)/split.yml --tags uninstall --limit master_nodes \
 		--extra-vars "ROOT_DIR=$(ROOT_DIR)" --extra-vars $(EXTRA_VARS)
+amp-split-monitor-cleanup:
+	@if [ -z "$(OCUDU_DETECTED_NODES)" ]; then \
+		ansible-playbook -i $(HOSTS_INI_FILE) $(AMP_ROOT_DIR)/split.yml --tags uninstall --limit master_nodes \
+			--extra-vars "ROOT_DIR=$(ROOT_DIR)" --extra-vars $(EXTRA_VARS); \
+	else \
+		echo "Preserving split monitoring in K8s (active OCUDU nodes: $(OCUDU_DETECTED_NODES))"; \
+	fi
 
 #### c. Provision Monitoring ####
 amp-monitor-install:
