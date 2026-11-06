@@ -53,14 +53,22 @@ amp-split-monitor-cleanup:
 	fi
 
 #### c.3 Orchestrated Split Monitoring (Aether MOCN Orchestrated) ####
+AMP_ORCH_RUNNING_CONTAINERS = $(shell docker ps --format '{{.Names}}' 2>/dev/null)
+AMP_ORCH_EXPORTER_NODES = $(strip $(filter node2 node3,$(AMP_ORCH_RUNNING_CONTAINERS)))
+AMP_ORCH_STOP_NODES = $(if $(AMP_ORCH_EXPORTER_NODES),$(shell echo $(AMP_ORCH_EXPORTER_NODES) | tr ' ' ','),)
+
 amp-orch-start: ocudu-orch-split-start amp-orch-exporter-install amp-orch-monitor-load
 amp-orch-stop: amp-orch-monitor-uninstall amp-orch-exporter-uninstall
 amp-orch-exporter-install:
 	ansible-playbook -i $(HOSTS_INI_FILE) $(AMP_ROOT_DIR)/split-orch.yml --tags install --limit orch_nodes \
 		--extra-vars "ROOT_DIR=$(ROOT_DIR)" --extra-vars $(EXTRA_VARS)
 amp-orch-exporter-uninstall:
-	ansible-playbook -i $(HOSTS_INI_FILE) $(AMP_ROOT_DIR)/split-orch.yml --tags uninstall --limit orch_nodes \
-		--extra-vars "ROOT_DIR=$(ROOT_DIR)" --extra-vars $(EXTRA_VARS)
+	@if [ -n "$(AMP_ORCH_STOP_NODES)" ]; then \
+		ansible-playbook -i $(HOSTS_INI_FILE) $(AMP_ROOT_DIR)/split-orch.yml --tags uninstall --limit $(AMP_ORCH_STOP_NODES) \
+			--extra-vars "ROOT_DIR=$(ROOT_DIR)" --extra-vars $(EXTRA_VARS); \
+	else \
+		echo "Skipping amp-orch-exporter-uninstall: no running target orchestrated node containers (node2, node3)"; \
+	fi
 amp-orch-monitor-load:
 	ansible-playbook -i $(HOSTS_INI_FILE) $(AMP_ROOT_DIR)/split-orch.yml --tags install --limit master_nodes \
 		--extra-vars "ROOT_DIR=$(ROOT_DIR)" --extra-vars $(EXTRA_VARS)

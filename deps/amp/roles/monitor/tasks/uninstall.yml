@@ -33,6 +33,11 @@
   when: inventory_hostname in groups['master_nodes']
   ignore_errors: yes
 
+- name: remove leftover custom.metrics APIService if present
+  command: kubectl delete apiservice v1beta1.custom.metrics.k8s.io --ignore-not-found
+  when: inventory_hostname in groups['master_nodes']
+  failed_when: false
+
 - name: delete namespace cattle-dashboards cattle-monitoring-system
   command:
     argv:
@@ -41,6 +46,7 @@
       - namespace
       - cattle-dashboards
       - cattle-monitoring-system
+      - --timeout=60s
   when: inventory_hostname in groups['master_nodes']
   ignore_errors: yes
 

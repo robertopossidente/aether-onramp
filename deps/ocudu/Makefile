@@ -99,6 +99,14 @@ ocudu-split-install: ocudu-nodes-up ocudu-docker-install ocudu-router-install oc
 ocudu-split-uninstall: ocudu-uesim-stop ocudu-split-stop ocudu-router-uninstall ocudu-nodes-down
 
 #### Orchestrated mode (Aether MOCN Orchestrated) ####
+OCUDU_ORCH_INVENTORY_NODES := $(shell awk '/^\[(ocu_nodes|odu_nodes|uesim_nodes)\]/{f=1;next} /^\[/{f=0} f && /^[a-zA-Z0-9_-]+/{print $$1}' $(HOSTS_INI_FILE) 2>/dev/null)
+OCUDU_ORCH_RUNNING_NODES = $(strip $(filter $(OCUDU_ORCH_INVENTORY_NODES),$(OCUDU_RUNNING_CONTAINERS)))
+export OCUDU_ORCH_STOP_NODES = $(if $(OCUDU_ORCH_RUNNING_NODES),$(shell echo $(OCUDU_ORCH_RUNNING_NODES) | tr ' ' ','),)
+export OCUDU_ORCH_OCU_STOP_NODES = $(strip $(filter node2,$(OCUDU_ORCH_RUNNING_NODES)))
+export OCUDU_ORCH_ODU_STOP_NODES = $(strip $(filter node3,$(OCUDU_ORCH_RUNNING_NODES)))
+export OCUDU_ORCH_SPLIT_STOP_NODES = $(if $(strip $(filter node2 node3,$(OCUDU_ORCH_RUNNING_NODES))),$(shell echo $(strip $(filter node2 node3,$(OCUDU_ORCH_RUNNING_NODES))) | tr ' ' ','),)
+export OCUDU_ORCH_UESIM_STOP_NODES = $(if $(strip $(filter node4 node5,$(OCUDU_ORCH_RUNNING_NODES))),$(shell echo $(strip $(filter node4 node5,$(OCUDU_ORCH_RUNNING_NODES))) | tr ' ' ','),)
+
 ocudu-orch-nodes-up:
 	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/nodes-orch.yml --tags up \
 		--extra-vars $(EXTRA_VARS)
@@ -112,8 +120,12 @@ ocudu-orch-router-install:
 		--extra-vars $(EXTRA_VARS)
 
 ocudu-orch-router-uninstall:
-	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/router-orch.yml --tags uninstall \
-		--extra-vars $(EXTRA_VARS)
+	@if [ -n "$(OCUDU_ORCH_STOP_NODES)" ]; then \
+		ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/router-orch.yml --tags uninstall \
+			--limit $(OCUDU_ORCH_STOP_NODES) --extra-vars $(EXTRA_VARS); \
+	else \
+		echo "Skipping ocudu-orch-router-uninstall: no running target orchestrated node containers"; \
+	fi
 
 ocudu-orch-docker-install:
 	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/docker-orch.yml --tags install \
@@ -124,32 +136,48 @@ ocudu-ocu-orch-start:
 		--extra-vars $(EXTRA_VARS)
 
 ocudu-ocu-orch-stop:
-	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/ocu-orch.yml --tags stop \
-		--extra-vars $(EXTRA_VARS)
+	@if [ -n "$(OCUDU_ORCH_OCU_STOP_NODES)" ]; then \
+		ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/ocu-orch.yml --tags stop \
+			--limit $(OCUDU_ORCH_OCU_STOP_NODES) --extra-vars $(EXTRA_VARS); \
+	else \
+		echo "Skipping ocudu-ocu-orch-stop: no running target O-CU node container (node2)"; \
+	fi
 
 ocudu-odu-orch-start:
 	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/odu-orch.yml --tags start \
 		--extra-vars $(EXTRA_VARS)
 
 ocudu-odu-orch-stop:
-	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/odu-orch.yml --tags stop \
-		--extra-vars $(EXTRA_VARS)
+	@if [ -n "$(OCUDU_ORCH_ODU_STOP_NODES)" ]; then \
+		ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/odu-orch.yml --tags stop \
+			--limit $(OCUDU_ORCH_ODU_STOP_NODES) --extra-vars $(EXTRA_VARS); \
+	else \
+		echo "Skipping ocudu-odu-orch-stop: no running target O-DU node container (node3)"; \
+	fi
 
 ocudu-orch-split-start:
 	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/split-orch.yml --tags start \
 		--extra-vars $(EXTRA_VARS)
 
 ocudu-orch-split-stop:
-	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/split-orch.yml --tags stop \
-		--extra-vars $(EXTRA_VARS)
+	@if [ -n "$(OCUDU_ORCH_SPLIT_STOP_NODES)" ]; then \
+		ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/split-orch.yml --tags stop \
+			--limit $(OCUDU_ORCH_SPLIT_STOP_NODES) --extra-vars $(EXTRA_VARS); \
+	else \
+		echo "Skipping ocudu-orch-split-stop: no running target split node containers (node2, node3)"; \
+	fi
 
 ocudu-orch-uesim-start:
 	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/uesim-orch.yml --tags start \
 		--extra-vars $(EXTRA_VARS)
 
 ocudu-orch-uesim-stop:
-	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/uesim-orch.yml --tags stop \
-		--extra-vars $(EXTRA_VARS)
+	@if [ -n "$(OCUDU_ORCH_UESIM_STOP_NODES)" ]; then \
+		ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/uesim-orch.yml --tags stop \
+			--limit $(OCUDU_ORCH_UESIM_STOP_NODES) --extra-vars $(EXTRA_VARS); \
+	else \
+		echo "Skipping ocudu-orch-uesim-stop: no running target UE simulator node containers (node4, node5)"; \
+	fi
 
 ocudu-orch-install: ocudu-orch-nodes-up ocudu-orch-docker-install ocudu-orch-router-install ocudu-orch-split-start ocudu-orch-uesim-start
 ocudu-orch-uninstall: ocudu-orch-uesim-stop ocudu-orch-split-stop ocudu-orch-router-uninstall ocudu-orch-nodes-down

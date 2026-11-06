@@ -2,6 +2,7 @@
 
 - name: remove split monitoring resources
   command: "kubectl delete {{ item }} --ignore-not-found"
+  failed_when: false
   loop:
     - servicemonitor/ocudu-exporter -n aether-5gc
     - endpoints -l app=ocudu-exporter -n aether-5gc

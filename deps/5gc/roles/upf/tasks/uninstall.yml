@@ -52,6 +52,11 @@
   when: inventory_hostname in groups['master_nodes']
   ignore_errors: yes
 
+- name: remove stale custom.metrics APIService if broken
+  command: kubectl delete apiservice v1beta1.custom.metrics.k8s.io --ignore-not-found
+  when: inventory_hostname in groups['master_nodes']
+  failed_when: false
+
 - name: delete namespace aether-upf
   command:
     argv:
@@ -59,6 +64,7 @@
       - delete
       - namespace
       - "aether-upf-{{ item.key }}"
+      - --timeout=60s
   with_dict: "{{ core.upf.additional_upfs | default({}) }}"
   when: inventory_hostname in groups['master_nodes']
   ignore_errors: yes

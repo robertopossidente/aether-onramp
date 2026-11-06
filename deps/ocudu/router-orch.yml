@@ -3,6 +3,7 @@
 - name: provision router and network settings for orchestrated nodes
   hosts: orch_nodes
   gather_facts: true
+  ignore_unreachable: true
 
   vars_files:
     - "vars/main.yml"
