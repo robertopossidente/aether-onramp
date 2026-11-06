@@ -1,0 +1,65 @@
+gnb_id: {{ current_cu.gnb_id | default(1000) }}
+
+cu_cp:
+  amf:
+    addrs: "{{ core.amf.ip }}"
+    bind_addrs: "{{ current_cu.n2_ip | default(hostvars[inventory_hostname].ansible_host) }}"
+    supported_tracking_areas:
+      - tac: 1
+        plmn_list:
+          - plmn: "00101"
+            tai_slice_support_list:
+{% for slice_item in (current_cu.tai_slice_support_list | default([{'sst': 1, 'sd': '010203'}, {'sst': 1, 'sd': '010204'}])) %}
+              - sst: {{ slice_item.sst }}
+{% if slice_item.sd is defined %}
+                sd: {{ slice_item.sd }}
+{% endif %}
+{% endfor %}
+  inactivity_timer: 7200
+  request_pdu_session_timeout: {{ current_cu.request_pdu_session_timeout | default(15) }}
+  f1ap:
+    bind_addrs: "{{ current_cu.f1_bind_ip | default(hostvars[inventory_hostname].ansible_host) }}"
+
+cu_up:
+  ngu:
+    socket:
+      - bind_addr: "{{ current_cu.n3_ip | default(hostvars[inventory_hostname].ansible_host) }}"
+        ext_addr: "{{ current_cu.n3_ip | default(hostvars[inventory_hostname].ansible_host) }}"
+  f1u:
+    bind_port: {{ current_cu.f1u_port | default(2153) }}
+    socket:
+      - bind_addr: "{{ current_cu.f1_bind_ip | default(hostvars[inventory_hostname].ansible_host) }}"
+
+log:
+  filename: stdout
+  all_level: info
+
+metrics:
+  enable_log: true
+  layers:
+    enable_ngap: true
+    enable_rrc: true
+    enable_pdcp: true
+    enable_e1ap: true
+  periodicity:
+    cu_cp_report_period: 1000
+    cu_up_report_period: 1000
+
+pcap:
+  ngap_enable: false
+  f1ap_enable: false
+
+buffer_pool:
+  nof_segments: {{ (ocudu_orch.ran_tuning if ocudu_orch is defined and ocudu_orch.ran_tuning is defined else (ocudu.ran_tuning if ocudu is defined and ocudu.ran_tuning is defined else {})).buffer_pool_segments | default(262144) }}
+
+expert_execution:
+  threads:
+    main_pool:
+      nof_threads: {{ (ocudu_orch.ran_tuning if ocudu_orch is defined and ocudu_orch.ran_tuning is defined else (ocudu.ran_tuning if ocudu is defined and ocudu.ran_tuning is defined else {})).cu_threads | default(1) }}
+      task_queue_size: {{ (ocudu_orch.ran_tuning if ocudu_orch is defined and ocudu_orch.ran_tuning is defined else (ocudu.ran_tuning if ocudu is defined and ocudu.ran_tuning is defined else {})).cu_task_queue_size | default(1024) }}
+      backoff_period: {{ (ocudu_orch.ran_tuning if ocudu_orch is defined and ocudu_orch.ran_tuning is defined else (ocudu.ran_tuning if ocudu is defined and ocudu.ran_tuning is defined else {})).cu_backoff_period | default(500) }}
+  queues:
+    cu_up_dl_ue_executor_queue_size: {{ (ocudu_orch.ran_tuning if ocudu_orch is defined and ocudu_orch.ran_tuning is defined else (ocudu.ran_tuning if ocudu is defined and ocudu.ran_tuning is defined else {})).cu_queue_size | default(1024) }}
+    cu_up_ul_ue_executor_queue_size: {{ (ocudu_orch.ran_tuning if ocudu_orch is defined and ocudu_orch.ran_tuning is defined else (ocudu.ran_tuning if ocudu is defined and ocudu.ran_tuning is defined else {})).cu_queue_size | default(1024) }}
+    cu_up_ctrl_ue_executor_queue_size: {{ (ocudu_orch.ran_tuning if ocudu_orch is defined and ocudu_orch.ran_tuning is defined else (ocudu.ran_tuning if ocudu is defined and ocudu.ran_tuning is defined else {})).cu_queue_size | default(1024) }}
+

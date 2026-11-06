@@ -1,0 +1,10 @@
+---
+
+- name: start uesim-orch
+  ansible.builtin.import_tasks: start.yml
+  tags: start
+
+- name: stop uesim-orch
+  ansible.builtin.import_tasks: stop.yml
+  tags: stop
+

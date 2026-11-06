@@ -1,0 +1,45 @@
+---
+
+- name: set sysctl for socket buffers
+  ansible.posix.sysctl:
+    name: "{{ item }}"
+    value: '24912805'
+    sysctl_set: true
+    reload: true
+  loop:
+    - net.core.wmem_max
+    - net.core.rmem_max
+  become: true
+
+- name: ensure O-DU image is present
+  community.docker.docker_image:
+    name: "{{ (ocudu_orch.docker.container.du_image if (ocudu_orch is defined and ocudu_orch.docker is defined and ocudu_orch.docker.container.du_image is defined) else (ocudu_orch.docker.container.gnb_image if (ocudu_orch is defined and ocudu_orch.docker is defined) else ocudu.docker.container.gnb_image)) }}"
+    source: "{{ 'local' if (airgapped.enabled | default(false) | bool or ocudu_orch.simulation | default(false) | bool) else 'pull' }}"
+  become: true
+
+- name: stop legacy conflicting containers if present
+  community.docker.docker_container:
+    name: "{{ item }}"
+    state: absent
+  loop:
+    - ocudu-gnb
+    - ocudu-cu
+    - ocudu-du
+    - rfsim5g-nr-ue
+  become: true
+
+- name: resolve DU instances targeting this host
+  ansible.builtin.set_fact:
+    target_dus: >-
+      {{
+        ocudu_orch.dus | default({}) | dict2items
+        | selectattr('value.target_host', 'equalto', inventory_hostname)
+        | list
+      }}
+
+- name: configure and launch O-DU instances
+  include_tasks: start_instance.yml
+  loop: "{{ target_dus }}"
+  loop_control:
+    loop_var: du_item
+

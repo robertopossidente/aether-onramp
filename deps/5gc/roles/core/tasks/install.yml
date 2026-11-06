@@ -141,6 +141,20 @@
     var: ran_subnet
   when: inventory_hostname in groups['master_nodes']
 
+- name: check for existing kafka-kraft secret
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    namespace: aether-5gc
+    name: kafka-kraft
+  register: existing_kafka_kraft
+  when: inventory_hostname in groups['master_nodes']
+
+- name: extract kafka clusterId if secret exists
+  ansible.builtin.set_fact:
+    kafka_cluster_id: "{{ (existing_kafka_kraft.resources[0].data['cluster-id'] | b64decode) if (existing_kafka_kraft.resources | default([]) | length > 0) else 'Ks229z0SBeqI0rox7jxQTn' }}"
+  when: inventory_hostname in groups['master_nodes']
+
 - name: remove /tmp/sdcore-5g-values.yaml
   file:
     path: "/tmp/sdcore-5g-values.yaml"

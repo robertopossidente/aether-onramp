@@ -420,6 +420,21 @@
   become: true
   ignore_errors: yes
 
+- name: delete NAT masquerade rule for additional UPF UE traffic
+  iptables:
+    table: nat
+    chain: POSTROUTING
+    source: "{{ item.value.ue_ip_pool }}"
+    out_interface: "{{ core.data_iface }}"
+    jump: MASQUERADE
+    state: absent
+  loop: "{{ core.upf.additional_upfs | default({}) | dict2items }}"
+  when:
+    - inventory_hostname in groups['master_nodes']
+    - core.upf.additional_upfs is defined
+  become: true
+  ignore_errors: yes
+
 - name: force systemd to reread configs
   systemd:
     daemon_reload: true

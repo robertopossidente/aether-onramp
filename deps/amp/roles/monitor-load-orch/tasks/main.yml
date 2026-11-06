@@ -1,0 +1,10 @@
+---
+
+- name: install amp/monitor-load-orch
+  import_tasks: roles/monitor-load-orch/tasks/install.yml
+  tags: install
+
+- name: uninstall amp/monitor-load-orch
+  import_tasks: roles/monitor-load-orch/tasks/uninstall.yml
+  tags: uninstall
+

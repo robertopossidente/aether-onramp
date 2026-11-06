@@ -1,0 +1,26 @@
+---
+
+- name: provision disaggregated O-CU instances
+  hosts: ocu_nodes
+  gather_facts: true
+
+  vars_files:
+    - "vars/main.yml"
+
+  environment: "{{ proxy_env }}"
+
+  roles:
+    - ocu-orch
+
+- name: provision disaggregated O-DU instances
+  hosts: odu_nodes
+  gather_facts: true
+
+  vars_files:
+    - "vars/main.yml"
+
+  environment: "{{ proxy_env }}"
+
+  roles:
+    - odu-orch
+

@@ -1,0 +1,39 @@
+---
+
+- name: provision docker for orchestrated nodes
+  hosts: orch_nodes
+  gather_facts: true
+
+  vars_files:
+    - "vars/main.yml"
+
+  environment: "{{ proxy_env }}"
+
+  tasks:
+    - name: collect installed package facts
+      package_facts:
+        manager: auto
+      become: true
+      tags: [install]
+
+    - name: check if docker is installed
+      command: docker --version
+      register: docker_version
+      changed_when: false
+      failed_when: false
+      tags: [install]
+
+    - name: print docker version output
+      debug:
+        var: docker_version.stdout
+      when: docker_version.rc == 0
+      tags: [install]
+
+    - name: ensure docker service is enabled and started
+      service:
+        name: docker
+        state: started
+        enabled: true
+      become: true
+      tags: [install]
+

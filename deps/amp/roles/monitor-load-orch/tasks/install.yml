@@ -1,0 +1,54 @@
+---
+
+- name: install kubernetes.core python prerequisite for amp/monitor-load-orch
+  import_role:
+    name: preflight
+    tasks_from: python_kubernetes.yml
+
+- name: verify kubeconfig prerequisites for amp/monitor-load-orch
+  import_role:
+    name: preflight
+    tasks_from: kubeconfig.yml
+  vars:
+    kubeconfig_component_name: AMP monitor-load-orch
+    kubeconfig_help_text: >-
+      Run make aether-amp-install first (Prometheus/Grafana stack).
+
+- name: ensure namespaces exist
+  kubernetes.core.k8s:
+    name: "{{ item }}"
+    kind: Namespace
+    state: present
+  loop:
+    - aether-5gc
+    - cattle-dashboards
+
+- name: create staging directory
+  file:
+    path: /tmp/monitoring-orch
+    state: directory
+    mode: "0755"
+
+- name: render kustomization and exporter manifests
+  template:
+    src: "{{ item.src }}"
+    dest: "/tmp/monitoring-orch/{{ item.dest }}"
+    mode: "0644"
+  loop:
+    - { src: kustomization.yaml.j2, dest: kustomization.yaml }
+    - { src: ocudu-exporter-orch.yaml.j2, dest: ocudu-exporter-orch.yaml }
+
+- name: copy orchestrated 5g dashboard
+  copy:
+    src: 5g-mocn-orch-dashboard.json
+    dest: /tmp/monitoring-orch/5g-mocn-orch-dashboard.json
+    mode: "0644"
+
+- name: apply orchestrated monitoring resources
+  command: kubectl apply -k /tmp/monitoring-orch
+
+- name: remove staging directory
+  file:
+    path: /tmp/monitoring-orch
+    state: absent
+

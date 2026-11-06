@@ -1,12 +1,14 @@
-# OCUDU split profile (O-CU + O-DU over F1, ZMQ radio, simulated UE) - MOCN Multi-UPF flavor.
-# Shared RAN (MOCN / Neutral Host) with IMSI/subscription-based Multi-UPF routing:
-# - Multiple split gNBs, one CU+DU pair per node (node2 and node3 in [ocudu_nodes]).
+# Mode: Aether MOCN Orchestrated
+# Disaggregated O-CU, O-DU, and simulated UE over ZMQ across independent nodes.
+# Multi-Node, Multi-UPF MOCN flavor:
+# - Independent O-CU on node2 (ocu_nodes)
+# - Independent O-DU on node3 (odu_nodes) connected to O-CU over routable F1 (SCTP/GTP-U)
+# - Simulated UEs on independent nodes (node4, node5 in uesim_nodes) connected over ZMQ TCP
 # - Core on node1 (master_nodes) with two UPFs:
 #     * default_upf (ns: aether-5gc)   -> slice "default"     (sst: 1, sd: 010203) -> user-group1 (IMSI 001010100007500, pool 192.168.100.0/24)
 #     * additional_upfs["1"] (aether-upf-1) -> slice "slice-upf-1" (sst: 1, sd: 010204) -> user-group2 (IMSI 001010100007501, pool 192.168.101.0/24)
-# Set core.amf.ip to node1's IP. Sequence: aether-5gc-install; aether-add-upfs; aether-ocudu-nodes-up;
-# aether-ocudu-hosts-install; ocudu-router-install; aether-ocudu-split-start; aether-ocudu-uesim-start
-# (or shortcut: make aether-ocudu-split-multi-mocn-install). Do not run together with the monolithic gNB.
+# Sequence / Target: make aether-mocn-orch-install / make aether-mocn-orch-uninstall
+
 proxy:
   enabled: false
   http_proxy: ""
@@ -60,12 +62,6 @@ core:
           access: "192.168.252.6"
           core:   "192.168.250.6"
         ue_ip_pool: "192.168.101.0/24"
-      # "2":
-      #   hostname: "upf.aether-upf-2"
-      #   ip:
-      #     access: "192.168.252.7"
-      #     core:   "192.168.250.7"
-      #   ue_ip_pool: "192.168.102.0/24"
   mocn:
     enabled: true
     slices:
@@ -88,9 +84,111 @@ core:
       http: 30500
       rest: 30501
 
+# --- Aether MOCN Orchestrated Entity Definitions ---
+ocudu_orch:
+  simulation: true
+  docker:
+    container:
+      cu_image: aetherproject/ocu:rel-1.0.0
+      du_image: aetherproject/odu:rel-1.0.0
+      gnb_image: aetherproject/ocudu:rel-1.0.0
+      ue_image: aetherproject/srsran-ue:rel-1.0.0
+    network:
+      name: host
+  ran_tuning:
+    buffer_pool_segments: 262144
+    cu_threads: 1
+    cu_task_queue_size: 1024
+    cu_backoff_period: 500
+    cu_queue_size: 1024
+    du_threads: 2
+    du_task_queue_size: 1024
+    du_backoff_period: 500
+    du_queue_size: 1024
+    ue_phy_threads: 1
+  node_containers:
+    enabled: true
+    image: aether-ocudu-node:latest
+    images:
+      ocu: aether-ocu-node:latest
+      odu: aether-odu-node:latest
+      uesim: aether-ue-node:latest
+    network:
+      name: aether-ran
+      subnet: "172.28.10.0/24"
+      gateway: "172.28.10.1"
+
+  # Independent O-CU (Centralized Unit) instances
+  cus:
+    cu1:
+      target_host: "node2"
+      gnb_id: 1000
+      n2_ip: "172.28.10.2"
+      n3_ip: "172.28.10.2"
+      f1_bind_ip: "172.28.10.2"
+      f1c_port: 38472
+      f1u_port: 2153
+      request_pdu_session_timeout: 15
+      tai_slice_support_list:
+        - sst: 1
+          sd: "010203"
+        - sst: 1
+          sd: "010204"
+
+  # Independent O-DU (Distributed Unit) instances
+  dus:
+    du1:
+      target_host: "node3"
+      gnb_id: 1000
+      gnb_du_id: 1
+      pci: 1
+      cu_f1_addr: "172.28.10.2"
+      du_f1_bind_ip: "172.28.10.3"
+      f1u_bind_port: 2152
+      f1u_peer_port: 2153
+      target_ue_ip: "172.28.10.4"
+      zmq_port: 2000
+      zmq_bind_ip: "0.0.0.0"
+      bandwidth_mhz: 10
+      du_rc_port: 8002
+    du2:
+      target_host: "node3"
+      gnb_id: 1000
+      gnb_du_id: 2
+      pci: 2
+      cu_f1_addr: "172.28.10.2"
+      du_f1_bind_ip: "172.28.10.13"
+      f1u_bind_port: 2152
+      f1u_peer_port: 2153
+      target_ue_ip: "172.28.10.5"
+      zmq_port: 2010
+      zmq_bind_ip: "0.0.0.0"
+      bandwidth_mhz: 10
+      du_rc_port: 8003
+
+  # Independent Simulated UE instances (ZMQ RF simulation over network)
+  ues:
+    ue1:
+      target_host: "node4"
+      imsi: "001010100007500"        # Tenant 1 -> Default Slice -> default_upf 192.168.100.0/24
+      ue_ip_pool: "192.168.100.0/24"
+      target_du_ip: "172.28.10.3"
+      zmq_port: 2000
+      target_upf_core_ip: "192.168.250.3"
+    ue2:
+      target_host: "node5"
+      imsi: "001010100007501"        # Tenant 2 -> slice-upf-1 -> aether-upf-1 192.168.101.0/24
+      ue_ip_pool: "192.168.101.0/24"
+      target_du_ip: "172.28.10.3"
+      zmq_port: 2010
+      target_upf_core_ip: "192.168.250.6"
+
+# Shared compatibility block for generic roles
 ocudu:
   docker:
     container:
+      cu_image: aetherproject/ocu:rel-1.0.0
+      du_image: aetherproject/odu:rel-1.0.0
       gnb_image: aetherproject/ocudu:rel-1.0.0
       ue_image: aetherproject/srsran-ue:rel-1.0.0
     network:
@@ -110,54 +208,21 @@ ocudu:
   node_containers:
     enabled: true
     image: aether-ocudu-node:latest
+    images:
+      ocu: aether-ocu-node:latest
+      odu: aether-odu-node:latest
+      uesim: aether-ue-node:latest
     network:
       name: aether-ran
       subnet: "172.28.10.0/24"
-      gateway: "172.28.10.1"           # bridge address on node1; next hop to the UPF access network
-  servers:
-    0:
-      gnb_ip: "172.28.10.2"               # node2 container: gNB1 = CU1 + DU1 (first host in [ocudu_nodes])
-      gnb_id: 1000                       # optional; default 1000 + index
-      pci: 1                             # optional; default 1 + index
-      ue:
-        imsi: "001010100007500"          # Tenant 1 (user-group1 -> slice "default" -> default_upf 192.168.100.0/24)
-        ue_ip_pool: "192.168.100.0/24"
-      gnb_conf: gnb_zmq.yaml
-      ue_conf: ue_zmq_split.conf         # 10 MHz UE matching the split DU cell
-      cu_conf: cu_f1.yaml                # deps/ocudu/roles/gNBSplit/templates/
-      du_conf: du_f1_zmq.yaml
-      f1:
-        cu_addr: "127.0.10.1"            # loopback addresses may repeat across hosts
-        du_addr: "127.0.10.2"
-        request_pdu_session_timeout: 15  # seconds; the 3 s default is too short for the SD-Core
-      dpdk:
-        enabled: false
-    1:
-      gnb_ip: "172.28.10.3"               # node3 container: gNB2 = CU2 + DU2
-      gnb_id: 1001
-      pci: 2
-      ue:
-        imsi: "001010100007501"          # Tenant 2 (user-group2 -> slice "slice-upf-1" -> aether-upf-1 192.168.101.0/24)
-        ue_ip_pool: "192.168.101.0/24"
-      gnb_conf: gnb_zmq.yaml
-      ue_conf: ue_zmq_split.conf
-      cu_conf: cu_f1.yaml
-      du_conf: du_f1_zmq.yaml
-      f1:
-        cu_addr: "127.0.10.1"
-        du_addr: "127.0.10.2"
-        request_pdu_session_timeout: 15
-      dpdk:
-        enabled: false
+      gateway: "172.28.10.1"
 
 amp:
   monitor_dashboard: "deps/amp/roles/monitor-load/templates/5g-monitoring"
-
   monitor:
     helm:
       chart_ref: rancher/rancher-monitoring
       chart_version: 110.0.1+up80.9.1-rancher.19
-
   monitor_crd:
     helm:
       chart_ref: rancher/rancher-monitoring-crd

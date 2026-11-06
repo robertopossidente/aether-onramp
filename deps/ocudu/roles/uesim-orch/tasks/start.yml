@@ -1,0 +1,23 @@
+---
+
+- name: ensure ue image is present
+  community.docker.docker_image:
+    name: "{{ (ocudu_orch.docker.container.ue_image if ocudu_orch is defined and ocudu_orch.docker is defined else ocudu.docker.container.ue_image) }}"
+    source: "{{ 'local' if (airgapped.enabled | default(false) | bool or ocudu_orch.simulation | default(false) | bool) else 'pull' }}"
+  become: true
+
+- name: resolve UE instances targeting this host
+  ansible.builtin.set_fact:
+    target_ues: >-
+      {{
+        ocudu_orch.ues | default({}) | dict2items
+        | selectattr('value.target_host', 'equalto', inventory_hostname)
+        | list
+      }}
+
+- name: configure and launch UE instances
+  include_tasks: start_instance.yml
+  loop: "{{ target_ues }}"
+  loop_control:
+    loop_var: ue_item
+

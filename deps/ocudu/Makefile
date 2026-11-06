@@ -97,3 +97,60 @@ ocudu-gnb-uninstall: ocudu-gnb-stop ocudu-router-uninstall
 
 ocudu-split-install: ocudu-nodes-up ocudu-docker-install ocudu-router-install ocudu-split-start ocudu-uesim-start
 ocudu-split-uninstall: ocudu-uesim-stop ocudu-split-stop ocudu-router-uninstall ocudu-nodes-down
+
+#### Orchestrated mode (Aether MOCN Orchestrated) ####
+ocudu-orch-nodes-up:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/nodes-orch.yml --tags up \
+		--extra-vars $(EXTRA_VARS)
+
+ocudu-orch-nodes-down:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/nodes-orch.yml --tags down \
+		--extra-vars $(EXTRA_VARS)
+
+ocudu-orch-router-install:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/router-orch.yml --tags install \
+		--extra-vars $(EXTRA_VARS)
+
+ocudu-orch-router-uninstall:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/router-orch.yml --tags uninstall \
+		--extra-vars $(EXTRA_VARS)
+
+ocudu-orch-docker-install:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/docker-orch.yml --tags install \
+		--extra-vars $(EXTRA_VARS)
+
+ocudu-ocu-orch-start:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/ocu-orch.yml --tags start \
+		--extra-vars $(EXTRA_VARS)
+
+ocudu-ocu-orch-stop:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/ocu-orch.yml --tags stop \
+		--extra-vars $(EXTRA_VARS)
+
+ocudu-odu-orch-start:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/odu-orch.yml --tags start \
+		--extra-vars $(EXTRA_VARS)
+
+ocudu-odu-orch-stop:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/odu-orch.yml --tags stop \
+		--extra-vars $(EXTRA_VARS)
+
+ocudu-orch-split-start:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/split-orch.yml --tags start \
+		--extra-vars $(EXTRA_VARS)
+
+ocudu-orch-split-stop:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/split-orch.yml --tags stop \
+		--extra-vars $(EXTRA_VARS)
+
+ocudu-orch-uesim-start:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/uesim-orch.yml --tags start \
+		--extra-vars $(EXTRA_VARS)
+
+ocudu-orch-uesim-stop:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(OCUDU_ROOT_DIR)/uesim-orch.yml --tags stop \
+		--extra-vars $(EXTRA_VARS)
+
+ocudu-orch-install: ocudu-orch-nodes-up ocudu-orch-docker-install ocudu-orch-router-install ocudu-orch-split-start ocudu-orch-uesim-start
+ocudu-orch-uninstall: ocudu-orch-uesim-stop ocudu-orch-split-stop ocudu-orch-router-uninstall ocudu-orch-nodes-down
+

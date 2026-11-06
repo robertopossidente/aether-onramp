@@ -1,0 +1,27 @@
+---
+
+- name: restart disaggregated O-DU containers to accept fresh ZMQ sessions
+  hosts: odu_nodes
+  gather_facts: false
+  become: true
+  tags: start
+  tasks:
+    - name: restart O-DU containers
+      ansible.builtin.shell: "docker restart $(docker ps -q --filter name=ocudu-du) || true"
+      changed_when: false
+    - name: wait for O-DU F1 setup after restart
+      ansible.builtin.pause:
+        seconds: 4
+
+- name: provision disaggregated simulated UE instances
+  hosts: uesim_nodes
+  gather_facts: true
+
+  vars_files:
+    - "vars/main.yml"
+
+  environment: "{{ proxy_env }}"
+
+  roles:
+    - uesim-orch
+

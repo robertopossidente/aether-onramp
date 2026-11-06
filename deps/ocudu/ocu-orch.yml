@@ -1,0 +1,15 @@
+---
+
+- name: provision disaggregated O-CU instances
+  hosts: ocu_nodes
+  gather_facts: true
+
+  vars_files:
+    - "vars/main.yml"
+    - "{{ playbook_dir }}/../../vars/main.yml"
+
+  environment: "{{ proxy_env }}"
+
+  roles:
+    - ocu-orch
+

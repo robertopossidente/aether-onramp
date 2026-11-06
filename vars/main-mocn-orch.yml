@@ -1,0 +1,230 @@
+# Mode: Aether MOCN Orchestrated
+# Disaggregated O-CU, O-DU, and simulated UE over ZMQ across independent nodes.
+# Multi-Node, Multi-UPF MOCN flavor:
+# - Independent O-CU on node2 (ocu_nodes)
+# - Independent O-DU on node3 (odu_nodes) connected to O-CU over routable F1 (SCTP/GTP-U)
+# - Simulated UEs on independent nodes (node4, node5 in uesim_nodes) connected over ZMQ TCP
+# - Core on node1 (master_nodes) with two UPFs:
+#     * default_upf (ns: aether-5gc)   -> slice "default"     (sst: 1, sd: 010203) -> user-group1 (IMSI 001010100007500, pool 192.168.100.0/24)
+#     * additional_upfs["1"] (aether-upf-1) -> slice "slice-upf-1" (sst: 1, sd: 010204) -> user-group2 (IMSI 001010100007501, pool 192.168.101.0/24)
+# Sequence / Target: make aether-mocn-orch-install / make aether-mocn-orch-uninstall
+
+proxy:
+  enabled: false
+  http_proxy: ""
+  https_proxy: ""
+  no_proxy: "localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,10.42.0.0/16,10.43.0.0/16,.svc,.svc.cluster.local,.cluster.local"
+
+airgapped:
+  enabled: false
+  allow_purge: false
+
+k8s:
+  rke2:
+    version: v1.36.4+rke2r1
+    config:
+      token: aether-k8s-rke2
+      port: 9345
+      params_file:
+        master: "deps/k8s/roles/rke2/templates/master-config.yaml"
+        worker: "deps/k8s/roles/rke2/templates/worker-config.yaml"
+
+  helm:
+    version: v3.20.0
+
+core:
+  data_iface: eth0
+  values_file: "deps/5gc/roles/core/templates/sdcore-5g-values.yaml"
+  ran_subnet: "172.28.10.0/24"    # ocudu.node_containers.network.subnet
+  helm:
+    local_charts: false      # set chart_ref to local path name if true
+    chart_ref: oci://ghcr.io/omec-project/sd-core
+    chart_version: 5.0.0
+  upf:
+    access_subnet: "192.168.252.1/24"  # access subnet & gateway
+    core_subnet: "192.168.250.1/24"  # core subnet & gateway
+    mode: af_packet      # Options: af_packet or dpdk
+    multihop_gnb: false      # set to true to override default N3 subnet
+    helm:
+      local_charts: false
+      chart_ref: oci://ghcr.io/omec-project/bess-upf
+      chart_version: 2.0.0
+    values_file: "deps/5gc/roles/upf/templates/upf-5g-values.yaml"
+    default_upf:
+      ip:
+        access: "192.168.252.3"
+        core:   "192.168.250.3"
+      ue_ip_pool: "192.168.100.0/24"
+    additional_upfs:
+      "1":
+        hostname: "upf.aether-upf-1"
+        ip:
+          access: "192.168.252.6"
+          core:   "192.168.250.6"
+        ue_ip_pool: "192.168.101.0/24"
+  mocn:
+    enabled: true
+    slices:
+      - name: "slice-upf-1"
+        sst: 1
+        sd: "010204"
+        upf_key: "1"
+        device_group: "user-group2"
+        pool_name: "pool2"
+        imsis:
+          - "001010100007501"
+        msisdns:
+          - "msisdn-9000000002"
+  amf:
+    ip: "172.30.255.119"
+  webui:
+    service_type: NodePort
+    node_ports:
+      metrics: 30808
+      http: 30500
+      rest: 30501
+
+# --- Aether MOCN Orchestrated Entity Definitions ---
+ocudu_orch:
+  simulation: true
+  docker:
+    container:
+      cu_image: aetherproject/ocu:rel-1.0.0
+      du_image: aetherproject/odu:rel-1.0.0
+      gnb_image: aetherproject/ocudu:rel-1.0.0
+      ue_image: aetherproject/srsran-ue:rel-1.0.0
+    network:
+      name: host
+  ran_tuning:
+    buffer_pool_segments: 262144
+    cu_threads: 1
+    cu_task_queue_size: 1024
+    cu_backoff_period: 500
+    cu_queue_size: 1024
+    du_threads: 2
+    du_task_queue_size: 1024
+    du_backoff_period: 500
+    du_queue_size: 1024
+    ue_phy_threads: 1
+  node_containers:
+    enabled: true
+    image: aether-ocudu-node:latest
+    images:
+      ocu: aether-ocu-node:latest
+      odu: aether-odu-node:latest
+      uesim: aether-ue-node:latest
+    network:
+      name: aether-ran
+      subnet: "172.28.10.0/24"
+      gateway: "172.28.10.1"
+
+  # Independent O-CU (Centralized Unit) instances
+  cus:
+    cu1:
+      target_host: "node2"
+      gnb_id: 1000
+      n2_ip: "172.28.10.2"
+      n3_ip: "172.28.10.2"
+      f1_bind_ip: "172.28.10.2"
+      f1c_port: 38472
+      f1u_port: 2153
+      request_pdu_session_timeout: 15
+      tai_slice_support_list:
+        - sst: 1
+          sd: "010203"
+        - sst: 1
+          sd: "010204"
+
+  # Independent O-DU (Distributed Unit) instances
+  dus:
+    du1:
+      target_host: "node3"
+      gnb_id: 1000
+      gnb_du_id: 1
+      pci: 1
+      cu_f1_addr: "172.28.10.2"
+      du_f1_bind_ip: "172.28.10.3"
+      f1u_bind_port: 2152
+      f1u_peer_port: 2153
+      target_ue_ip: "172.28.10.4"
+      zmq_port: 2000
+      zmq_bind_ip: "0.0.0.0"
+      bandwidth_mhz: 10
+      du_rc_port: 8002
+    du2:
+      target_host: "node3"
+      gnb_id: 1000
+      gnb_du_id: 2
+      pci: 2
+      cu_f1_addr: "172.28.10.2"
+      du_f1_bind_ip: "172.28.10.13"
+      f1u_bind_port: 2152
+      f1u_peer_port: 2153
+      target_ue_ip: "172.28.10.5"
+      zmq_port: 2010
+      zmq_bind_ip: "0.0.0.0"
+      bandwidth_mhz: 10
+      du_rc_port: 8003
+
+  # Independent Simulated UE instances (ZMQ RF simulation over network)
+  ues:
+    ue1:
+      target_host: "node4"
+      imsi: "001010100007500"        # Tenant 1 -> Default Slice -> default_upf 192.168.100.0/24
+      ue_ip_pool: "192.168.100.0/24"
+      target_du_ip: "172.28.10.3"
+      zmq_port: 2000
+      target_upf_core_ip: "192.168.250.3"
+    ue2:
+      target_host: "node5"
+      imsi: "001010100007501"        # Tenant 2 -> slice-upf-1 -> aether-upf-1 192.168.101.0/24
+      ue_ip_pool: "192.168.101.0/24"
+      target_du_ip: "172.28.10.3"
+      zmq_port: 2010
+      target_upf_core_ip: "192.168.250.6"
+
+# Shared compatibility block for generic roles
+ocudu:
+  docker:
+    container:
+      cu_image: aetherproject/ocu:rel-1.0.0
+      du_image: aetherproject/odu:rel-1.0.0
+      gnb_image: aetherproject/ocudu:rel-1.0.0
+      ue_image: aetherproject/srsran-ue:rel-1.0.0
+    network:
+      name: host
+  simulation: true
+  ran_tuning:
+    buffer_pool_segments: 262144
+    cu_threads: 1
+    cu_task_queue_size: 1024
+    cu_backoff_period: 500
+    cu_queue_size: 1024
+    du_threads: 2
+    du_task_queue_size: 1024
+    du_backoff_period: 500
+    du_queue_size: 1024
+    ue_phy_threads: 1
+  node_containers:
+    enabled: true
+    image: aether-ocudu-node:latest
+    images:
+      ocu: aether-ocu-node:latest
+      odu: aether-odu-node:latest
+      uesim: aether-ue-node:latest
+    network:
+      name: aether-ran
+      subnet: "172.28.10.0/24"
+      gateway: "172.28.10.1"
+
+amp:
+  monitor_dashboard: "deps/amp/roles/monitor-load/templates/5g-monitoring"
+  monitor:
+    helm:
+      chart_ref: rancher/rancher-monitoring
+      chart_version: 110.0.1+up80.9.1-rancher.19
+  monitor_crd:
+    helm:
+      chart_ref: rancher/rancher-monitoring-crd
+      chart_version: 110.0.1+up80.9.1-rancher.19
+

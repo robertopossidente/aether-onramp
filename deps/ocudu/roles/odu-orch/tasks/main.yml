@@ -1,0 +1,10 @@
+---
+
+- name: start odu-orch
+  ansible.builtin.import_tasks: start.yml
+  tags: start
+
+- name: stop odu-orch
+  ansible.builtin.import_tasks: stop.yml
+  tags: stop
+

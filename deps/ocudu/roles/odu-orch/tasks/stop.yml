@@ -1,0 +1,25 @@
+---
+
+- name: resolve DU instances targeting this host
+  ansible.builtin.set_fact:
+    target_dus: >-
+      {{
+        ocudu_orch.dus | default({}) | dict2items
+        | selectattr('value.target_host', 'equalto', inventory_hostname)
+        | list
+      }}
+
+- name: stop O-DU containers
+  community.docker.docker_container:
+    name: "ocudu-du-{{ item.key }}"
+    state: absent
+  loop: "{{ target_dus }}"
+  become: true
+
+- name: remove O-DU configs
+  ansible.builtin.file:
+    path: "/tmp/ocudu_du_{{ item.key }}.yaml"
+    state: absent
+  loop: "{{ target_dus }}"
+  become: true
+

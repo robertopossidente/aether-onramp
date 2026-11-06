@@ -95,6 +95,24 @@ aether-ocudu-split-multi-uninstall: aether-ocudu-split-uninstall amp-uninstall a
 aether-ocudu-split-multi-mocn-install: k8s-install 5gc-install aether-add-upfs aether-webui-gui-start amp-install aether-ocudu-split-install
 aether-ocudu-split-multi-mocn-uninstall: aether-ocudu-split-uninstall amp-uninstall aether-webui-gui-stop aether-remove-upfs 5gc-uninstall k8s-uninstall
 
+#### Aether MOCN Orchestrated (Disaggregated CU, DU, and UE across independent nodes) ####
+aether-mocn-orch-nodes-up: ocudu-orch-nodes-up
+aether-mocn-orch-nodes-down: ocudu-orch-nodes-down
+aether-ocu-orch-start: ocudu-ocu-orch-start
+aether-ocu-orch-stop: ocudu-ocu-orch-stop
+aether-odu-orch-start: ocudu-odu-orch-start
+aether-odu-orch-stop: ocudu-odu-orch-stop
+aether-uesim-orch-start: ocudu-orch-uesim-start
+aether-uesim-orch-stop: ocudu-orch-uesim-stop
+aether-mocn-orch-split-start: ocudu-orch-split-start
+aether-mocn-orch-split-stop: ocudu-orch-split-stop
+aether-mocn-orch-split-install: ocudu-orch-install amp-orch-exporter-install amp-orch-monitor-load
+aether-mocn-orch-split-uninstall: amp-orch-exporter-uninstall ocudu-orch-uninstall amp-orch-monitor-cleanup
+
+#### Unique Single Install/Uninstall Targets for Aether MOCN Orchestrated ####
+aether-mocn-orch-install: k8s-install 5gc-install aether-add-upfs aether-webui-gui-start amp-install aether-mocn-orch-split-install
+aether-mocn-orch-uninstall: aether-mocn-orch-split-uninstall amp-uninstall aether-webui-gui-stop aether-remove-upfs 5gc-uninstall k8s-uninstall
+
 #### Provision AETHER for 4G ####
 #### 4G/5G share router role ####
 aether-4gc-install: 4gc-core-install 5gc-router-install

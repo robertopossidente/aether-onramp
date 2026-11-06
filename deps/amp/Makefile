@@ -52,6 +52,25 @@ amp-split-monitor-cleanup:
 		echo "Preserving split monitoring in K8s (active OCUDU nodes: $(OCUDU_DETECTED_NODES))"; \
 	fi
 
+#### c.3 Orchestrated Split Monitoring (Aether MOCN Orchestrated) ####
+amp-orch-start: ocudu-orch-split-start amp-orch-exporter-install amp-orch-monitor-load
+amp-orch-stop: amp-orch-monitor-uninstall amp-orch-exporter-uninstall
+amp-orch-exporter-install:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(AMP_ROOT_DIR)/split-orch.yml --tags install --limit orch_nodes \
+		--extra-vars "ROOT_DIR=$(ROOT_DIR)" --extra-vars $(EXTRA_VARS)
+amp-orch-exporter-uninstall:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(AMP_ROOT_DIR)/split-orch.yml --tags uninstall --limit orch_nodes \
+		--extra-vars "ROOT_DIR=$(ROOT_DIR)" --extra-vars $(EXTRA_VARS)
+amp-orch-monitor-load:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(AMP_ROOT_DIR)/split-orch.yml --tags install --limit master_nodes \
+		--extra-vars "ROOT_DIR=$(ROOT_DIR)" --extra-vars $(EXTRA_VARS)
+amp-orch-monitor-uninstall:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(AMP_ROOT_DIR)/split-orch.yml --tags uninstall --limit master_nodes \
+		--extra-vars "ROOT_DIR=$(ROOT_DIR)" --extra-vars $(EXTRA_VARS)
+amp-orch-monitor-cleanup:
+	ansible-playbook -i $(HOSTS_INI_FILE) $(AMP_ROOT_DIR)/split-orch.yml --tags uninstall --limit master_nodes \
+		--extra-vars "ROOT_DIR=$(ROOT_DIR)" --extra-vars $(EXTRA_VARS)
+
 #### c. Provision Monitoring ####
 amp-monitor-install:
 	ansible-playbook -i $(HOSTS_INI_FILE) $(AMP_ROOT_DIR)/monitor.yml --tags install \

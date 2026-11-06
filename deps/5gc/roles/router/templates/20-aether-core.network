@@ -11,3 +11,11 @@ Address={{ core.upf.core_subnet }}
 [Route]
 Gateway={{ core.upf.default_upf.ip.core }}
 Destination={{ core.upf.default_upf.ue_ip_pool }}
+{% if core.upf.additional_upfs is defined %}
+{% for upf_id, upf in core.upf.additional_upfs.items() %}
+
+[Route]
+Gateway={{ upf.ip.core }}
+Destination={{ upf.ue_ip_pool }}
+{% endfor %}
+{% endif %}

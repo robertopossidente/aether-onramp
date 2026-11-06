@@ -1,0 +1,64 @@
+---
+
+- name: set facts for DU {{ du_item.key }}
+  ansible.builtin.set_fact:
+    du_id: "{{ du_item.key }}"
+    current_du: "{{ du_item.value }}"
+    du_container_name: "ocudu-du-{{ du_item.key }}"
+
+- name: verify reachability of target O-CU host {{ current_du.cu_f1_addr }}
+  ansible.builtin.command: ping -c 1 -W 2 {{ current_du.cu_f1_addr }}
+  changed_when: false
+
+- name: ensure DU bind IP {{ current_du.du_f1_bind_ip }} is present on host
+  ansible.builtin.shell: >-
+    ip -4 addr show dev eth0 | grep -q "{{ current_du.du_f1_bind_ip }}/" ||
+    ip addr add {{ current_du.du_f1_bind_ip }}/24 dev eth0
+  become: true
+  when:
+    - current_du.du_f1_bind_ip is defined
+    - current_du.du_f1_bind_ip != hostvars[inventory_hostname].ansible_host
+  ignore_errors: true
+
+- name: render O-DU config file
+  ansible.builtin.template:
+    src: du_f1_zmq.yaml.j2
+    dest: "/tmp/ocudu_du_{{ du_id }}.yaml"
+    mode: "0644"
+  register: du_config
+  become: true
+
+- name: remove existing O-DU container {{ du_container_name }} if present
+  community.docker.docker_container:
+    name: "{{ du_container_name }}"
+    state: absent
+  become: true
+
+- name: launch O-DU container {{ du_container_name }}
+  community.docker.docker_container:
+    name: "{{ du_container_name }}"
+    image: "{{ (ocudu_orch.docker.container.du_image if (ocudu_orch is defined and ocudu_orch.docker is defined and ocudu_orch.docker.container.du_image is defined) else (ocudu_orch.docker.container.gnb_image if ocudu_orch is defined and ocudu_orch.docker is defined else ocudu.docker.container.gnb_image)) }}"
+    network_mode: host
+    volumes:
+      - "/tmp/ocudu_du_{{ du_id }}.yaml:/opt/du_config.yaml"
+    capabilities:
+      - IPC_LOCK
+      - NET_ADMIN
+    privileged: false
+    restart_policy: unless-stopped
+    state: started
+    detach: true
+    interactive: false
+    tty: false
+    command: "odu -c /opt/du_config.yaml"
+    restart: "{{ du_config.changed | default(false) }}"
+  become: true
+
+- name: wait for O-DU ZMQ radio port to listen
+  ansible.builtin.wait_for:
+    host: "{{ current_du.du_f1_bind_ip | default('127.0.0.1') }}"
+    port: "{{ current_du.zmq_port | default(2000) }}"
+    state: started
+    timeout: 30
+  ignore_errors: true
+

@@ -5,3 +5,13 @@
 grafana:
   service:
     type: NodePort
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 2048Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  livenessProbe:
+    failureThreshold: 30
+

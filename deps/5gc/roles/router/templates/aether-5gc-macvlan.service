@@ -20,6 +20,11 @@ ExecStart=/usr/sbin/ip addr replace {{ core.upf.core_subnet }} dev core
 ExecStart=/usr/sbin/ip link set core up
 ExecStart=-/usr/sbin/sysctl -w net.ipv4.conf.core.forwarding=1
 ExecStart=/usr/sbin/ip route replace {{ core.upf.default_upf.ue_ip_pool }} via {{ core.upf.default_upf.ip.core }} dev core onlink
+{% if core.upf.additional_upfs is defined %}
+{% for upf_id, upf in core.upf.additional_upfs.items() %}
+ExecStart=/usr/sbin/ip route replace {{ upf.ue_ip_pool }} via {{ upf.ip.core }} dev core onlink
+{% endfor %}
+{% endif %}
 {% if not core.upf.multihop_gnb %}
 ExecStop=-/usr/sbin/ip link del access
 {% endif %}

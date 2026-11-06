@@ -70,6 +70,12 @@ blueprints include:
   to a distinct network slice and dedicated UPF (`default_upf` in `aether-5gc`
   and `additional_upfs["1"]` in `aether-upf-1`).
 
+* `main-mocn-orch.yml` (Aether MOCN Orchestrated): Fully disaggregated
+  architecture where O-CU, O-DU, and simulated UEs run on independent nodes
+  (not in fixed pairs). Employs routable inter-node F1 (F1-C over SCTP and
+  F1-U over GTP-U) and network-based ZeroMQ (ZMQ) RF simulation across nodes,
+  with independent lifecycle orchestration and Multi-UPF MOCN routing.
+
 * `main-n3iwf.yml`: Configures the SD-Core with a N3IWF entity for non-3GPP access.
   Details documented
   [here](https://docs.aetherproject.org/onramp/blueprints.html#non-3gpp-interworking-function).

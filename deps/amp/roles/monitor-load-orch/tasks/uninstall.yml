@@ -1,0 +1,10 @@
+---
+
+- name: remove orchestrated monitoring resources
+  command: "kubectl delete {{ item }} --ignore-not-found"
+  loop:
+    - servicemonitor/ocudu-exporter-orch -n aether-5gc
+    - endpoints -l app=ocudu-exporter-orch -n aether-5gc
+    - service -l app=ocudu-exporter-orch -n aether-5gc
+    - configmap/grafana-aether-mocn-orch-dashboards -n cattle-dashboards
+

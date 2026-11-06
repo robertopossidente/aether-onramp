@@ -1,0 +1,13 @@
+resources:
+  - ./ocudu-exporter-orch.yaml
+
+configMapGenerator:
+  - name: grafana-aether-mocn-orch-dashboards
+    namespace: cattle-dashboards
+    files:
+      - ./5g-mocn-orch-dashboard.json
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    grafana_dashboard: "1"
+

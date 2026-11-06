@@ -1,0 +1,104 @@
+---
+
+- name: set facts for UE {{ ue_item.key }}
+  ansible.builtin.set_fact:
+    ue_id: "{{ ue_item.key }}"
+    current_ue: "{{ ue_item.value }}"
+    ue_container_name: "rfsim5g-nr-ue-{{ ue_item.key }}"
+
+- name: wait for target O-DU ZMQ radio port to be reachable at {{ current_ue.target_du_ip }}:{{ current_ue.zmq_port | default(2000) }}
+  ansible.builtin.wait_for:
+    host: "{{ current_ue.target_du_ip }}"
+    port: "{{ current_ue.zmq_port | default(2000) }}"
+    state: started
+    timeout: 30
+  ignore_errors: true
+
+- name: render UE config file
+  ansible.builtin.template:
+    src: ue_zmq_split.conf.j2
+    dest: "/tmp/ue_zmq_{{ ue_id }}.conf"
+    mode: "0644"
+  become: true
+
+- name: remove existing container {{ ue_container_name }} if present
+  community.docker.docker_container:
+    name: "{{ ue_container_name }}"
+    state: absent
+  become: true
+
+- name: cleanup any stale netns ue1 on host
+  command: ip netns del ue1
+  become: true
+  ignore_errors: true
+
+- name: launch UE simulator container {{ ue_container_name }}
+  community.docker.docker_container:
+    name: "{{ ue_container_name }}"
+    image: "{{ (ocudu_orch.docker.container.ue_image if ocudu_orch is defined and ocudu_orch.docker is defined else ocudu.docker.container.ue_image) }}"
+    network_mode: host
+    volumes:
+      - "/tmp/ue_zmq_{{ ue_id }}.conf:/opt/ue_zmq.conf"
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    privileged: false
+    capabilities:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_ADMIN
+    restart_policy: unless-stopped
+    state: started
+    detach: true
+  become: true
+
+- name: wait for UE tunnel interface in netns ue1
+  community.docker.docker_container_exec:
+    container: "{{ ue_container_name }}"
+    command: "ip netns exec ue1 ip -4 -o addr show dev tun_srsue"
+  register: ue_tunnel
+  retries: 45
+  delay: 2
+  until: ue_tunnel.rc == 0 and (ue_tunnel.stdout | default('') | trim | length > 0)
+  changed_when: false
+  become: true
+  ignore_errors: true
+
+- name: resolve assigned UE IP and pool
+  ansible.builtin.set_fact:
+    ue_assigned_cidr: >-
+      {{
+        (ue_tunnel.stdout | default('') | regex_search('inet ([0-9.]+/[0-9]+)', '\1') | first)
+        if (ue_tunnel.stdout | default('') is search('inet [0-9.]+/[0-9]+'))
+        else (current_ue.ue_ip_pool | default('192.168.100.0/24'))
+      }}
+
+- name: bring up loopback inside netns ue1
+  community.docker.docker_container_exec:
+    container: "{{ ue_container_name }}"
+    command: "ip netns exec ue1 ip link set lo up"
+  become: true
+  ignore_errors: true
+
+- name: configure default route via UPF inside netns ue1
+  community.docker.docker_container_exec:
+    container: "{{ ue_container_name }}"
+    command: >-
+      ip netns exec ue1 ip route replace default via
+      {{ (ue_assigned_cidr.split('.'))[:3] | join('.') }}.1
+      dev tun_srsue
+  become: true
+  ignore_errors: true
+
+- name: test ping to UPF core gateway from UE netns
+  community.docker.docker_container_exec:
+    container: "{{ ue_container_name }}"
+    command: "ip netns exec ue1 ping -c 4 {{ (core.upf.core_subnet | regex_replace('(/.*$)', '')) if (core is defined and core.upf is defined and core.upf.core_subnet is defined) else (current_ue.target_upf_core_ip | default('192.168.250.3')) }}"
+  register: ue_ping_output
+  changed_when: false
+  become: true
+  ignore_errors: true
+
+- name: display UE ping results
+  ansible.builtin.debug:
+    msg: "{{ ue_ping_output.stdout_lines | default(['No ping response']) }}"
+

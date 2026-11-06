@@ -1,0 +1,51 @@
+---
+
+- name: set facts for CU {{ cu_item.key }}
+  ansible.builtin.set_fact:
+    cu_id: "{{ cu_item.key }}"
+    current_cu: "{{ cu_item.value }}"
+    cu_container_name: "ocudu-cu-{{ cu_item.key }}"
+
+- name: remove existing O-CU container {{ cu_container_name }} if present
+  community.docker.docker_container:
+    name: "{{ cu_container_name }}"
+    state: absent
+  become: true
+
+- name: render O-CU config file
+  ansible.builtin.template:
+    src: cu_f1.yaml.j2
+    dest: "/tmp/ocudu_cu_{{ cu_id }}.yaml"
+    mode: "0644"
+  register: cu_config
+  become: true
+
+- name: launch O-CU container {{ cu_container_name }}
+  community.docker.docker_container:
+    name: "{{ cu_container_name }}"
+    image: "{{ (ocudu_orch.docker.container.cu_image if (ocudu_orch is defined and ocudu_orch.docker is defined and ocudu_orch.docker.container.cu_image is defined) else (ocudu_orch.docker.container.gnb_image if ocudu_orch is defined and ocudu_orch.docker is defined else ocudu.docker.container.gnb_image)) }}"
+    network_mode: host
+    volumes:
+      - "/tmp/ocudu_cu_{{ cu_id }}.yaml:/opt/cu_config.yaml"
+    capabilities:
+      - IPC_LOCK
+      - NET_ADMIN
+    privileged: false
+    restart_policy: unless-stopped
+    state: started
+    detach: true
+    interactive: false
+    tty: false
+    command: "ocu -c /opt/cu_config.yaml"
+    restart: "{{ cu_config.changed | default(false) }}"
+  become: true
+
+- name: wait for O-CU F1-C SCTP port to listen
+  ansible.builtin.shell: |
+    ss -S -l | grep -q "{{ current_cu.f1c_port | default(38472) }}"
+  register: sctp_listen
+  until: sctp_listen.rc == 0
+  retries: 15
+  delay: 1
+  changed_when: false
+

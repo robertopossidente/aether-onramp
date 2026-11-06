@@ -4,10 +4,10 @@
 """Prometheus exporter for the OCUDU disaggregated gNB (O-CU + O-DU).
 
 * O-DU: JSON metrics pushed through the local remote control WebSocket
-  (command "metrics_subscribe").
+  (command "metrics_subscribe"). Supports multiple O-DU instances.
 * O-CU: "[METRICS]" lines printed to the container log (the ocu binary has no
-  JSON gateway).
-* Container state: docker inspect.
+  JSON gateway). Supports multiple slices and DUs.
+* Container state: docker inspect with auto-discovery.
 
 Only the Python standard library and the docker CLI are required.
 """
@@ -31,8 +31,19 @@ STALE_SECONDS = 5.0
 lock = threading.Lock()
 state = {
     "args": None,
-    "docker": {},
-    "du": {"ws_up": 0, "last": 0.0, "cells": [], "cells_ts": 0.0, "mac": [], "mac_ts": 0.0},
+    "docker": {
+        "cu": {"running": 0, "started": 0.0, "restarts": 0, "present": False},
+        "du": {"running": 0, "started": 0.0, "restarts": 0, "present": False},
+    },
+    "du": {
+        "ws_up_ports": set(),
+        "ws_up": 0,
+        "last": 0.0,
+        "cells_by_port": {},
+        "cells_ts_by_port": {},
+        "mac_by_port": {},
+        "mac_ts_by_port": {},
+    },
     "cu": {"last": 0.0, "ngap": {}, "rrc": {}, "e1ap": {}, "pdcp": {}},
     "counters": {},
 }
@@ -127,14 +138,14 @@ class WebSocket:
 
 
 # ---------------------------------------------------------------------- DU --
-def handle_du_message(msg):
+def handle_du_message(port, msg):
     ts = now()
     with lock:
         du = state["du"]
         du["last"] = ts
         if "cells" in msg:
-            du["cells"] = msg["cells"]
-            du["cells_ts"] = ts
+            du["cells_by_port"][port] = msg["cells"]
+            du["cells_ts_by_port"][port] = ts
             for cell in msg["cells"]:
                 cm = cell.get("cell_metrics", {})
                 pci = str(cm.get("pci", 0))
@@ -162,18 +173,19 @@ def handle_du_message(msg):
         elif "du" in msg:
             mac = msg["du"].get("du_high", {}).get("mac", {}).get("dl")
             if mac is not None:
-                du["mac"] = mac
-                du["mac_ts"] = ts
+                du["mac_by_port"][port] = mac
+                du["mac_ts_by_port"][port] = ts
 
 
-def du_loop():
+def du_worker(port):
     args = state["args"]
     while True:
         ws = None
         try:
-            ws = WebSocket(args.du_ws_host, args.du_ws_port)
+            ws = WebSocket(args.du_ws_host, port)
             ws.send(json.dumps({"cmd": "metrics_subscribe"}))
             with lock:
+                state["du"]["ws_up_ports"].add(port)
                 state["du"]["ws_up"] = 1
             last_ping = now()
             while True:
@@ -183,7 +195,7 @@ def du_loop():
                     except ValueError:
                         continue
                     if isinstance(msg, dict):
-                        handle_du_message(msg)
+                        handle_du_message(port, msg)
                 elif now() - last_ping > 10:
                     ws.send(b"", 0x9)
                     last_ping = now()
@@ -193,8 +205,37 @@ def du_loop():
             if ws:
                 ws.close()
             with lock:
-                state["du"]["ws_up"] = 0
+                state["du"]["ws_up_ports"].discard(port)
+                state["du"]["ws_up"] = 1 if len(state["du"]["ws_up_ports"]) > 0 else 0
         time.sleep(2)
+
+
+def du_loop():
+    active_threads = {}
+    while True:
+        ports = []
+        raw_ports = getattr(state["args"], "du_ws_port", 8002)
+        if isinstance(raw_ports, int):
+            ports.append(raw_ports)
+        elif isinstance(raw_ports, str):
+            for p in raw_ports.split(","):
+                p = p.strip()
+                if p.isdigit():
+                    ports.append(int(p))
+        for p in range(8002, 8006):
+            if p not in ports:
+                try:
+                    with socket.create_connection(("127.0.0.1", p), timeout=0.05):
+                        ports.append(p)
+                except OSError:
+                    pass
+        ports = sorted(list(set(ports)))
+        for p in ports:
+            if p not in active_threads or not active_threads[p].is_alive():
+                t = threading.Thread(target=du_worker, args=(p,), daemon=True)
+                active_threads[p] = t
+                t.start()
+        time.sleep(5)
 
 
 # ---------------------------------------------------------------------- CU --
@@ -219,56 +260,78 @@ def handle_cu_line(line):
     with lock:
         cu = state["cu"]
         if "CU-CP NGAP metrics" in line:
-            amf = re.search(r"amf_name=(\S+)", line)
-            conn = re.search(r"connected=(true|false)", line)
-            nssai = re.search(r"s-nssai=\(sst=(\d+)(?: sd=(\d+))?\)", line)
-            slice_label = "sst:%s sd:%s" % (nssai.group(1), nssai.group(2) or "-") if nssai else "-"
-            req = re.search(r"nof_pdu_sessions_requested_to_setup=(\d+)", line)
-            ok = re.search(r"nof_pdu_sessions_successfully_setup=(\d+)", line)
-            cu["ngap"][(amf.group(1) if amf else "unknown", slice_label)] = {
-                "connected": 1 if conn and conn.group(1) == "true" else 0,
-                "requested": int(req.group(1)) if req else 0,
-                "setup": int(ok.group(1)) if ok else 0,
-                "failed": sum_group(line, "nof_pdu_sessions_failed_to_setup"),
-                "ts": ts,
-            }
+            amf_m = re.search(r"amf_name=(\S+)", line)
+            amf_name = amf_m.group(1) if amf_m else "AMF"
+            conn_m = re.search(r"connected=(true|false)", line)
+            is_conn = 1 if conn_m and conn_m.group(1) == "true" else 0
+            
+            slice_matches = re.finditer(
+                r"s-nssai=\(sst=(\d+)(?: sd=(\d+))?\)\s+"
+                r"nof_pdu_sessions_requested_to_setup=(\d+)\s+"
+                r"nof_pdu_sessions_successfully_setup=(\d+)",
+                line
+            )
+            for sm in slice_matches:
+                sst, sd, req, ok = sm.groups()
+                sd_str = sd if sd else "-"
+                slice_label = "sst:%s sd:%s" % (sst, sd_str)
+                cu["ngap"][(amf_name, slice_label)] = {
+                    "connected": is_conn,
+                    "requested": int(req),
+                    "setup": int(ok),
+                    "failed": sum_group(line, "nof_pdu_sessions_failed_to_setup"),
+                    "ts": ts,
+                }
+            cu["last"] = ts
+
         elif "CU-CP RRC metrics" in line:
-            du_id = re.search(r"gnb_du_id=(\d+)", line)
-            mean = re.search(r"mean_nof_rrc_connections=([\d.]+)", line)
-            mx = re.search(r"max_nof_rrc_connections=(\d+)", line)
-            cu["rrc"][du_id.group(1) if du_id else "0"] = {
-                "mean": float(mean.group(1)) if mean else 0.0,
-                "max": int(mx.group(1)) if mx else 0,
-                "attempted": sum_group(line, "attempted_rrc_connection_establishments"),
-                "successful": sum_group(line, "successful_rrc_connection_establishments"),
-                "ts": ts,
-            }
-        elif "E1AP metrics" in line:
+            sections = re.findall(r"gnb_du_id=\d+.*?(?=(?:,\s*\[\s*gnb_du_id=|\s*\],\s*nof_handover|\Z))", line, re.DOTALL)
+            for s in sections:
+                du_m = re.search(r"gnb_du_id=(\d+)", s)
+                if not du_m:
+                    continue
+                du_id = du_m.group(1)
+                mean_m = re.search(r"mean_nof_rrc_connections=([\d.]+)", s)
+                mx_m = re.search(r"max_nof_rrc_connections=(\d+)", s)
+                cu["rrc"][du_id] = {
+                    "mean": float(mean_m.group(1)) if mean_m else 0.0,
+                    "max": int(mx_m.group(1)) if mx_m else 0,
+                    "attempted": sum_group(s, "attempted_rrc_connection_establishments"),
+                    "successful": sum_group(s, "successful_rrc_connection_establishments"),
+                    "ts": ts,
+                }
+            cu["last"] = ts
+
+        elif "CU-UP E1AP metrics" in line or "E1AP metrics" in line:
             cu["e1ap"] = {
                 "ctx_setup": int((re.search(r"num_success_ctx_setup=(\d+)", line) or [0, 0])[1]),
                 "ctx_modification": int((re.search(r"num_success_ctx_modification=(\d+)", line) or [0, 0])[1]),
                 "ctx_releases": int((re.search(r"num_ctx_releases=(\d+)", line) or [0, 0])[1]),
                 "ts": ts,
             }
+            cu["last"] = ts
+
         elif "PDCP Metrics" in line:
-            m = re.search(r"ue=(\d+) rb=(\S+) tx=\[(.*?)\] rx=\[(.*?)\]", line)
+            m = re.search(r"ue=(\d+)\s+rb=(\S+)\s+tx=\[(.*?)\]\s+rx=\[(.*?)\]", line)
             if m:
                 rates = {}
                 for direction, body in (("tx", m.group(3)), ("rx", m.group(4))):
                     r = re.search(r"sdu_rate=\s*([\d.]+\s*[kKMG]?bps)", body)
                     rates[direction] = parse_rate(r.group(1)) if r else 0.0
                 cu["pdcp"][(m.group(1), m.group(2))] = dict(rates, ts=ts)
-        else:
-            return
-        cu["last"] = ts
+                cu["last"] = ts
 
 
 def cu_loop():
-    args = state["args"]
     while True:
+        cu_names = find_cu_containers()
+        if not cu_names:
+            time.sleep(2)
+            continue
+        target = cu_names[0]
         try:
             proc = subprocess.Popen(
-                ["docker", "logs", "-f", "--since", "1s", args.cu_container],
+                ["docker", "logs", "-f", "--since", "2s", target],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
@@ -283,27 +346,107 @@ def cu_loop():
 
 
 # ------------------------------------------------------------------ docker --
+def find_containers_by_name_or_prefix(given, default_prefix):
+    candidates = []
+    if given and given != "auto":
+        for c in str(given).split(","):
+            c = c.strip()
+            if c:
+                candidates.append(c)
+    found = []
+    for c in candidates:
+        try:
+            res = subprocess.run(["docker", "inspect", "--format", "{{.State.Running}}", c],
+                                 capture_output=True, text=True, timeout=5)
+            if res.returncode == 0:
+                found.append(c)
+        except Exception:
+            pass
+    if found:
+        return found
+    prefixes = candidates + [default_prefix]
+    for p in prefixes:
+        if not p or p == "auto":
+            continue
+        try:
+            res = subprocess.run(["docker", "ps", "-a", "--filter", "name=%s" % p, "--format", "{{.Names}}"],
+                                 capture_output=True, text=True, timeout=5)
+            if res.returncode == 0:
+                for line in res.stdout.splitlines():
+                    name = line.strip()
+                    if name and name not in found:
+                        found.append(name)
+        except Exception:
+            pass
+    return found
+
+
+def find_cu_containers():
+    arg_val = getattr(state["args"], "cu_container", "ocudu-cu") if state["args"] else "ocudu-cu"
+    return find_containers_by_name_or_prefix(arg_val, "ocudu-cu")
+
+
+def find_du_containers():
+    arg_val = getattr(state["args"], "du_container", "ocudu-du") if state["args"] else "ocudu-du"
+    return find_containers_by_name_or_prefix(arg_val, "ocudu-du")
+
+
+def inspect_single(name):
+    info = {"running": 0, "started": 0.0, "restarts": 0}
+    try:
+        out = subprocess.run(
+            ["docker", "inspect", "--format",
+             "{{.State.Running}} {{.State.StartedAt}} {{.RestartCount}}", name],
+            capture_output=True, text=True, timeout=10,
+        )
+        if out.returncode == 0:
+            running, started, restarts = out.stdout.split()
+            info["running"] = 1 if running == "true" else 0
+            info["restarts"] = int(restarts)
+            stamp = started.split(".")[0].rstrip("Z")
+            info["started"] = float(calendar.timegm(time.strptime(stamp, "%Y-%m-%dT%H:%M:%S")))
+    except (OSError, ValueError, subprocess.SubprocessError):
+        pass
+    return info
+
+
 def docker_loop():
-    args = state["args"]
     while True:
-        for component, name in (("cu", args.cu_container), ("du", args.du_container)):
-            info = {"running": 0, "started": 0.0, "restarts": 0}
-            try:
-                out = subprocess.run(
-                    ["docker", "inspect", "--format",
-                     "{{.State.Running}} {{.State.StartedAt}} {{.RestartCount}}", name],
-                    capture_output=True, text=True, timeout=10,
-                )
-                if out.returncode == 0:
-                    running, started, restarts = out.stdout.split()
-                    info["running"] = 1 if running == "true" else 0
-                    info["restarts"] = int(restarts)
-                    stamp = started.split(".")[0].rstrip("Z")
-                    info["started"] = float(calendar.timegm(time.strptime(stamp, "%Y-%m-%dT%H:%M:%S")))
-            except (OSError, ValueError, subprocess.SubprocessError):
-                pass
-            with lock:
-                state["docker"][component] = info
+        cu_names = find_cu_containers()
+        cu_running = 0
+        cu_started = 0.0
+        cu_restarts = 0
+        for name in cu_names:
+            inf = inspect_single(name)
+            if inf["running"]:
+                cu_running = 1
+                cu_started = max(cu_started, inf["started"])
+                cu_restarts += inf["restarts"]
+
+        du_names = find_du_containers()
+        du_running = 0
+        du_started = 0.0
+        du_restarts = 0
+        for name in du_names:
+            inf = inspect_single(name)
+            if inf["running"]:
+                du_running = 1
+                du_started = max(du_started, inf["started"])
+                du_restarts += inf["restarts"]
+
+        with lock:
+            state["docker"]["cu"] = {
+                "running": cu_running,
+                "started": cu_started,
+                "restarts": cu_restarts,
+                "present": len(cu_names) > 0,
+            }
+            state["docker"]["du"] = {
+                "running": du_running,
+                "started": du_started,
+                "restarts": du_restarts,
+                "present": len(du_names) > 0,
+            }
         time.sleep(5)
 
 
@@ -337,63 +480,74 @@ def build_metrics():
     with lock:
         dock, du, cu = state["docker"], state["du"], state["cu"]
 
-        for component in ("cu", "du"):
-            info = dock.get(component, {"running": 0, "started": 0.0, "restarts": 0})
-            out.add("ocudu_container_up", "gauge", "Container is running", info["running"], component=component)
-            out.add("ocudu_container_start_timestamp_seconds", "gauge", "Container start time", info["started"], component=component)
-            out.add("ocudu_container_restarts", "gauge", "Docker restart count", info["restarts"], component=component)
-
+        cu_present = dock.get("cu", {}).get("present", False)
+        du_present = dock.get("du", {}).get("present", False)
         cu_running = dock.get("cu", {}).get("running", 0)
         du_running = dock.get("du", {}).get("running", 0)
-        cu_fresh = t - cu["last"] < STALE_SECONDS
-        cu_up = 1 if cu_running and cu_fresh else 0
-        du_up = 1 if du_running and du["ws_up"] else 0
-        out.add("ocudu_cu_up", "gauge", "O-CU running and reporting metrics", cu_up)
-        out.add("ocudu_du_up", "gauge", "O-DU running and remote control reachable", du_up)
-        out.add("ocudu_cu_last_report_timestamp_seconds", "gauge", "Last O-CU metrics line", cu["last"])
-        out.add("ocudu_du_last_report_timestamp_seconds", "gauge", "Last O-DU metrics message", du["last"])
 
-        for (amf, slice_label), v in cu["ngap"].items():
-            if t - v["ts"] >= STALE_SECONDS:
-                continue
-            out.add("ocudu_cu_ngap_connected", "gauge", "NGAP association with the AMF", v["connected"], amf_name=amf, slice=slice_label)
-            out.add("ocudu_cu_ngap_pdu_sessions_requested_total", "counter", "PDU sessions requested to setup", v["requested"], amf_name=amf, slice=slice_label)
-            out.add("ocudu_cu_ngap_pdu_sessions_setup_total", "counter", "PDU sessions successfully set up", v["setup"], amf_name=amf, slice=slice_label)
-            out.add("ocudu_cu_ngap_pdu_sessions_failed_total", "counter", "PDU sessions failed to setup", v["failed"], amf_name=amf, slice=slice_label)
+        for component in ("cu", "du"):
+            info = dock.get(component, {"running": 0, "started": 0.0, "restarts": 0, "present": False})
+            if info["present"]:
+                out.add("ocudu_container_up", "gauge", "Container is running", info["running"], component=component)
+                out.add("ocudu_container_start_timestamp_seconds", "gauge", "Container start time", info["started"], component=component)
+                out.add("ocudu_container_restarts", "gauge", "Docker restart count", info["restarts"], component=component)
 
-        for du_id, v in cu["rrc"].items():
-            if t - v["ts"] >= STALE_SECONDS:
-                continue
-            out.add("ocudu_f1_du_connected", "gauge", "O-DU known by the O-CU over F1 (and O-DU up)", du_up, du_id=du_id)
-            out.add("ocudu_cu_rrc_connections_mean", "gauge", "Mean RRC connections", v["mean"], du_id=du_id)
-            out.add("ocudu_cu_rrc_connections_max", "gauge", "Max RRC connections", v["max"], du_id=du_id)
-            out.add("ocudu_cu_rrc_establishments_attempted_total", "counter", "RRC establishments attempted", v["attempted"], du_id=du_id)
-            out.add("ocudu_cu_rrc_establishments_successful_total", "counter", "RRC establishments successful", v["successful"], du_id=du_id)
-        if not any(t - v["ts"] < STALE_SECONDS for v in cu["rrc"].values()):
-            out.add("ocudu_f1_du_connected", "gauge", "O-DU known by the O-CU over F1 (and O-DU up)", 0, du_id="0")
+        if cu_present:
+            cu_fresh = t - cu["last"] < STALE_SECONDS
+            cu_up = 1 if cu_running and cu_fresh else 0
+            out.add("ocudu_cu_up", "gauge", "O-CU running and reporting metrics", cu_up)
+            out.add("ocudu_cu_last_report_timestamp_seconds", "gauge", "Last O-CU metrics line", cu["last"])
 
-        e1 = cu["e1ap"]
-        if e1 and t - e1["ts"] < STALE_SECONDS:
-            out.add("ocudu_cu_e1ap_ctx_setup_total", "counter", "E1AP bearer context setups", e1["ctx_setup"])
-            out.add("ocudu_cu_e1ap_ctx_modification_total", "counter", "E1AP bearer context modifications", e1["ctx_modification"])
-            out.add("ocudu_cu_e1ap_ctx_releases_total", "counter", "E1AP bearer context releases", e1["ctx_releases"])
+            for (amf, slice_label), v in cu["ngap"].items():
+                if t - v["ts"] >= STALE_SECONDS:
+                    continue
+                out.add("ocudu_cu_ngap_connected", "gauge", "NGAP association with the AMF", v["connected"], amf_name=amf, slice=slice_label)
+                out.add("ocudu_cu_ngap_pdu_sessions_requested_total", "counter", "PDU sessions requested to setup", v["requested"], amf_name=amf, slice=slice_label)
+                out.add("ocudu_cu_ngap_pdu_sessions_setup_total", "counter", "PDU sessions successfully set up", v["setup"], amf_name=amf, slice=slice_label)
+                out.add("ocudu_cu_ngap_pdu_sessions_failed_total", "counter", "PDU sessions failed to setup", v["failed"], amf_name=amf, slice=slice_label)
 
-        for (ue, rb), v in cu["pdcp"].items():
-            if t - v["ts"] >= STALE_SECONDS:
-                continue
-            out.add("ocudu_cu_pdcp_sdu_rate_bps", "gauge", "PDCP SDU rate", v["tx"], ue=ue, rb=rb, direction="tx")
-            out.add("ocudu_cu_pdcp_sdu_rate_bps", "gauge", "PDCP SDU rate", v["rx"], ue=ue, rb=rb, direction="rx")
+            for du_id, v in cu["rrc"].items():
+                if t - v["ts"] >= STALE_SECONDS:
+                    continue
+                out.add("ocudu_f1_du_connected", "gauge", "O-DU known by the O-CU over F1", 1, du_id=du_id)
+                out.add("ocudu_cu_rrc_connections_mean", "gauge", "Mean RRC connections", v["mean"], du_id=du_id)
+                out.add("ocudu_cu_rrc_connections_max", "gauge", "Max RRC connections", v["max"], du_id=du_id)
+                out.add("ocudu_cu_rrc_establishments_attempted_total", "counter", "RRC establishments attempted", v["attempted"], du_id=du_id)
+                out.add("ocudu_cu_rrc_establishments_successful_total", "counter", "RRC establishments successful", v["successful"], du_id=du_id)
+            if not any(t - v["ts"] < STALE_SECONDS for v in cu["rrc"].values()):
+                out.add("ocudu_f1_du_connected", "gauge", "O-DU known by the O-CU over F1", 0, du_id="0")
 
-        ues = 0
-        if t - du["cells_ts"] < STALE_SECONDS:
-            for cell in du["cells"]:
+            e1 = cu["e1ap"]
+            if e1 and t - e1["ts"] < STALE_SECONDS:
+                out.add("ocudu_cu_e1ap_ctx_setup_total", "counter", "E1AP bearer context setups", e1["ctx_setup"])
+                out.add("ocudu_cu_e1ap_ctx_modification_total", "counter", "E1AP bearer context modifications", e1["ctx_modification"])
+                out.add("ocudu_cu_e1ap_ctx_releases_total", "counter", "E1AP bearer context releases", e1["ctx_releases"])
+
+            for (ue, rb), v in cu["pdcp"].items():
+                if t - v["ts"] >= STALE_SECONDS:
+                    continue
+                out.add("ocudu_cu_pdcp_sdu_rate_bps", "gauge", "PDCP SDU rate", v["tx"], ue=ue, rb=rb, direction="tx")
+                out.add("ocudu_cu_pdcp_sdu_rate_bps", "gauge", "PDCP SDU rate", v["rx"], ue=ue, rb=rb, direction="rx")
+
+        if du_present:
+            du_up = 1 if du_running and du["ws_up"] else 0
+            out.add("ocudu_du_up", "gauge", "O-DU running and remote control reachable", du_up)
+            out.add("ocudu_du_last_report_timestamp_seconds", "gauge", "Last O-DU metrics message", du["last"])
+
+            all_cells = []
+            for port, cells in du["cells_by_port"].items():
+                if t - du["cells_ts_by_port"].get(port, 0.0) < STALE_SECONDS:
+                    all_cells.extend(cells)
+
+            total_ues = 0
+            for cell in all_cells:
                 cm = cell.get("cell_metrics", {})
                 pci = str(cm.get("pci", 0))
                 out.add("ocudu_du_cell_scheduler_latency_avg_us", "gauge", "Scheduler average latency", cm.get("average_latency", 0), pci=pci)
                 out.add("ocudu_du_cell_scheduler_latency_max_us", "gauge", "Scheduler max latency", cm.get("max_latency", 0), pci=pci)
                 out.add("ocudu_du_cell_pucch_rb_usage", "gauge", "Average PUCCH RB usage", cm.get("pucch_tot_rb_usage_avg", 0), pci=pci)
                 for ue in cell.get("ue_list", []):
-                    ues += 1
+                    total_ues += 1
                     labels = {"pci": pci, "ue": str(ue.get("ue", 0)), "rnti": "0x%04x" % ue.get("rnti", 0)}
                     for name, key, help_text in (
                         ("ocudu_du_ue_dl_bitrate_bps", "dl_brate", "UE downlink bitrate"),
@@ -408,13 +562,15 @@ def build_metrics():
                     ):
                         if key in ue:
                             out.add(name, "gauge", help_text, ue[key], **labels)
-        out.add("ocudu_du_connected_ues", "gauge", "UEs reported by the O-DU scheduler", ues)
 
-        if t - du["mac_ts"] < STALE_SECONDS:
-            for item in du["mac"]:
-                pci = str(item.get("pci", 0))
-                out.add("ocudu_du_mac_dl_latency_avg_us", "gauge", "MAC DL average latency", item.get("average_latency_us", 0), pci=pci)
-                out.add("ocudu_du_mac_dl_cpu_usage_percent", "gauge", "MAC DL CPU usage", item.get("cpu_usage_percent", 0), pci=pci)
+            out.add("ocudu_du_connected_ues", "gauge", "UEs reported by the O-DU scheduler", total_ues)
+
+            for port, mac_list in du["mac_by_port"].items():
+                if t - du["mac_ts_by_port"].get(port, 0.0) < STALE_SECONDS:
+                    for item in mac_list:
+                        pci = str(item.get("pci", 0))
+                        out.add("ocudu_du_mac_dl_latency_avg_us", "gauge", "MAC DL average latency", item.get("average_latency_us", 0), pci=pci)
+                        out.add("ocudu_du_mac_dl_cpu_usage_percent", "gauge", "MAC DL CPU usage", item.get("cpu_usage_percent", 0), pci=pci)
 
         for (name, labels), value in state["counters"].items():
             out.add(name, "counter", name.replace("_", " "), value, **dict(labels))
@@ -448,7 +604,7 @@ def main():
     parser.add_argument("--cu-container", default="ocudu-cu")
     parser.add_argument("--du-container", default="ocudu-du")
     parser.add_argument("--du-ws-host", default="127.0.0.1")
-    parser.add_argument("--du-ws-port", type=int, default=8002)
+    parser.add_argument("--du-ws-port", default="8002")
     state["args"] = parser.parse_args()
     for target in (du_loop, cu_loop, docker_loop):
         threading.Thread(target=target, daemon=True).start()

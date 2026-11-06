@@ -1,0 +1,6 @@
+FROM aether-ocudu-node:latest
+
+LABEL org.opencontainers.image.title="Aether O-DU Node" \
+      org.opencontainers.image.description="Simulated host node for O-DU" \
+      org.opencontainers.image.version="1.0.0"
+

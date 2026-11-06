@@ -1,0 +1,1613 @@
+{
+  "uid": "aether-5g-mocn-orch",
+  "title": "Aether MOCN Orchestrated - 5G Dashboard",
+  "tags": [
+    "aether",
+    "5g",
+    "mocn",
+    "orchestrated",
+    "split"
+  ],
+  "schemaVersion": 39,
+  "version": 2,
+  "editable": true,
+  "refresh": "10s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "gnb",
+        "label": "gNB (node)",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(up{job=~\"ocudu-exporter-.*\"}, gnb)",
+          "refId": "gnb"
+        },
+        "definition": "label_values(up{job=~\"ocudu-exporter-.*\"}, gnb)",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": "node2|node3",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "sort": 1
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(up{job=\"upf-http\"}, upf)",
+        "includeAll": true,
+        "label": "UPF",
+        "multi": true,
+        "name": "upf",
+        "query": {
+          "query": "label_values(up{job=\"upf-http\"}, upf)",
+          "refId": "upf"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 200,
+      "type": "row",
+      "title": "Aether MOCN Orchestrated: Vis\u00e3o por Node Desagregado (CU / DU / UE)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "RAN E2E Orchestrated (AMF + CU + DU + F1)",
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 0,
+        "y": 1
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "clamp_max((max(ocudu_cu_ngap_connected) * max(ocudu_cu_up) * max(ocudu_du_up) * max(ocudu_f1_du_connected)) or (0 * max(up{job=~\"ocudu-exporter-.*\"})), 1)",
+          "legendFormat": "{{gnb}}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Down",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "Connected",
+                  "color": "green"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 204,
+      "type": "stat",
+      "title": "NGAP (node2 \u2194 AMF)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 3,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max(ocudu_cu_ngap_connected) or (0 * max(up{job=~\"ocudu-exporter-.*\"}))",
+          "legendFormat": "NGAP N2"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "horizontal"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN"
+                },
+                "1": {
+                  "text": "UP"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 201,
+      "type": "stat",
+      "title": "O-CU (Host node2)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 6,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max(ocudu_cu_up{gnb=\"node2\"}) or (0 * max(up{job=~\"ocudu-exporter-.*\"}))",
+          "legendFormat": "O-CU node2"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "horizontal"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN"
+                },
+                "1": {
+                  "text": "UP"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 203,
+      "type": "stat",
+      "title": "F1 Midhaul (node2 \u2194 node3)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 9,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max(ocudu_f1_du_connected) or (0 * max(up{job=~\"ocudu-exporter-.*\"}))",
+          "legendFormat": "F1 Midhaul"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "horizontal"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN"
+                },
+                "1": {
+                  "text": "UP"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 202,
+      "type": "stat",
+      "title": "O-DU (Host node3)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 12,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max(ocudu_du_up{gnb=\"node3\"}) or (0 * max(up{job=~\"ocudu-exporter-.*\"}))",
+          "legendFormat": "O-DU node3"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "horizontal"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN"
+                },
+                "1": {
+                  "text": "UP"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "UPFs MOCN",
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 15,
+        "y": 1
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (upf) (up{job=\"upf-http\", upf=~\"$upf\"})",
+          "legendFormat": "{{upf}}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Down",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "Up",
+                  "color": "green"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "displayName": "${__field.labels.upf}"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "id": 205,
+      "type": "stat",
+      "title": "UE 1 Sim (Host node4)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 18,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "clamp_max(count(core_subscriber{state=\"Connected\", imsi=~\".*7500\"}), 1) or (0 * max(up{job=\"upf-http\"}))",
+          "legendFormat": "UE1 (node4)"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "horizontal"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "CONNECTED",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 206,
+      "type": "stat",
+      "title": "UE 2 Sim (Host node5)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 21,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "clamp_max(count(core_subscriber{state=\"Connected\", imsi=~\".*7501\"}), 1) or (0 * max(up{job=\"upf-http\"}))",
+          "legendFormat": "UE2 (node5)"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "horizontal"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "CONNECTED",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 209,
+      "type": "stat",
+      "title": "UEs Ativos no O-DU (Host node3)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(ocudu_du_connected_ues{gnb=\"node3\"}) or (0 * max(up{job=~\"ocudu-exporter-.*\"}))",
+          "legendFormat": "UEs"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "horizontal"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 210,
+      "type": "stat",
+      "title": "Sess\u00f5es PDU (O-CU node2)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(ocudu_cu_ngap_pdu_sessions_setup_total{gnb=\"node2\"}) or (0 * max(up{job=~\"ocudu-exporter-.*\"}))",
+          "legendFormat": "Sess\u00f5es PDU"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "horizontal"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 207,
+      "type": "timeseries",
+      "title": "Bitrate DL por C\u00e9lula (O-DU)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 8,
+        "y": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (pci) (ocudu_du_ue_dl_bitrate_bps{gnb=\"node3\"})",
+          "legendFormat": "PCI {{pci}} DL"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "right"
+        }
+      }
+    },
+    {
+      "id": 208,
+      "type": "timeseries",
+      "title": "Bitrate UL por C\u00e9lula (O-DU)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 8,
+        "x": 16,
+        "y": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (pci) (ocudu_du_ue_ul_bitrate_bps{gnb=\"node3\"})",
+          "legendFormat": "PCI {{pci}} UL"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "right"
+        }
+      }
+    },
+    {
+      "id": 100,
+      "type": "row",
+      "title": "Status de Conex\u00e3o e Sess\u00f5es MOCN",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "gNBs registrados no AMF",
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 10
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "label_replace(label_replace(label_replace(label_replace(max by (gnb, instance) (ocudu_cu_ngap_connected{gnb=~\"$gnb\"} > 0), \"ip\", \"$1\", \"instance\", \"([^:]+):.*\"), \"gnb_id\", \"1000 (O-CU)\", \"gnb\", \"node2\"), \"amf_name\", \"AMF\", \"\", \"\"), \"tac\", \"000001\", \"\", \"\")",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "Disconnected",
+                        "color": "red"
+                      },
+                      "1": {
+                        "text": "Connected",
+                        "color": "green"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true
+            },
+            "renameByName": {
+              "Value": "state"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Assinantes MOCN e Mapeamento de Slices/UPF",
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 10
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (imsi, ip_addr, dnn, slice, upf) (label_replace(label_replace(core_subscriber{state=\"Connected\"}, \"upf\", \"aether-upf-0\", \"slice\", \".*010203.*\"), \"upf\", \"aether-upf-1\", \"slice\", \".*010204.*\"))",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "Disconnected",
+                        "color": "red"
+                      },
+                      "1": {
+                        "text": "Connected",
+                        "color": "green"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true
+            },
+            "renameByName": {
+              "Value": "state"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 101,
+      "type": "row",
+      "title": "UPF",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      }
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "Throughput UPF",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 17
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (upf, iface, dir) (rate(upf_bytes_count{upf=~\"$upf\"}[1m])) * 8",
+          "legendFormat": "{{upf}} {{iface}} {{dir}}"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Pacotes/s e drops",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 17
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "pps"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (upf, iface, dir) (rate(upf_packets_count{upf=~\"$upf\"}[1m]))",
+          "legendFormat": "pkts {{upf}} {{iface}} {{dir}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (upf, iface, dir) (rate(upf_dropped_count{upf=~\"$upf\"}[1m]))",
+          "legendFormat": "drop {{upf}} {{iface}} {{dir}}"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Lat\u00eancia e jitter UPF (m\u00e9dia)",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 17
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (upf, iface) (rate(upf_latency_ns_sum{upf=~\"$upf\"}[1m])) / sum by (upf, iface) (rate(upf_latency_ns_count{upf=~\"$upf\"}[1m])) / 1e6",
+          "legendFormat": "lat\u00eancia {{upf}} {{iface}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (upf, iface) (rate(upf_jitter_ns_sum{upf=~\"$upf\"}[1m])) / sum by (upf, iface) (rate(upf_jitter_ns_count{upf=~\"$upf\"}[1m])) / 1e6",
+          "legendFormat": "jitter {{upf}} {{iface}}"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "Mensagens PFCP/s",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 25
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (upf, message_type, direction) (rate(pfcp_messages_duration_seconds_count{upf=~\"$upf\"}[5m]))",
+          "legendFormat": "{{upf}} {{message_type}} {{direction}}"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "type": "timeseries",
+      "title": "Sess\u00f5es PDU (SMF)",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 25
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (upf) (label_replace(label_replace(label_replace(smf_pdu_sessions{service=\"metricfunc\"}, \"upf\", \"aether-upf-0\", \"upf\", \"upf\"), \"upf\", \"aether-upf-0\", \"slice\", \".*010203.*\"), \"upf\", \"aether-upf-1\", \"slice\", \".*010204.*\")) * on(upf) group_left() (up{job=\"upf-http\", upf=~\"$upf\"} * 0 + 1)",
+          "legendFormat": "sess\u00f5es {{upf}}"
+        }
+      ]
+    },
+    {
+      "id": 102,
+      "type": "row",
+      "title": "CU (CU-CP / CU-UP)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      }
+    },
+    {
+      "id": 30,
+      "type": "timeseries",
+      "title": "Conex\u00f5es RRC",
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 0,
+        "y": 33
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ocudu_cu_rrc_connections_mean{gnb=~\"$gnb\"}",
+          "legendFormat": "{{gnb}} m\u00e9dia du={{du_id}}"
+        },
+        {
+          "refId": "B",
+          "expr": "ocudu_cu_rrc_connections_max{gnb=~\"$gnb\"}",
+          "legendFormat": "{{gnb}} m\u00e1x du={{du_id}}"
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "type": "timeseries",
+      "title": "Estabelecimentos RRC (acumulado)",
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 6,
+        "y": 33
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ocudu_cu_rrc_establishments_attempted_total{gnb=~\"$gnb\"}",
+          "legendFormat": "{{gnb}} tentados"
+        },
+        {
+          "refId": "B",
+          "expr": "ocudu_cu_rrc_establishments_successful_total{gnb=~\"$gnb\"}",
+          "legendFormat": "{{gnb}} sucesso"
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "type": "timeseries",
+      "title": "Sess\u00f5es PDU via NGAP (acumulado)",
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 12,
+        "y": 33
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ocudu_cu_ngap_pdu_sessions_requested_total{gnb=~\"$gnb\"}",
+          "legendFormat": "{{gnb}} solicitadas"
+        },
+        {
+          "refId": "B",
+          "expr": "ocudu_cu_ngap_pdu_sessions_setup_total{gnb=~\"$gnb\"}",
+          "legendFormat": "{{gnb}} estabelecidas"
+        },
+        {
+          "refId": "C",
+          "expr": "ocudu_cu_ngap_pdu_sessions_failed_total{gnb=~\"$gnb\"}",
+          "legendFormat": "{{gnb}} falhas"
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "type": "timeseries",
+      "title": "Taxa PDCP por UE (CU)",
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 18,
+        "y": 33
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ocudu_cu_pdcp_sdu_rate_bps{gnb=~\"$gnb\"}",
+          "legendFormat": "{{gnb}} ue {{ue}} {{rb}} {{direction}}"
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "type": "timeseries",
+      "title": "E1AP contextos (acumulado)",
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ocudu_cu_e1ap_ctx_setup_total{gnb=~\"$gnb\"}",
+          "legendFormat": "{{gnb}} setup"
+        },
+        {
+          "refId": "B",
+          "expr": "ocudu_cu_e1ap_ctx_modification_total{gnb=~\"$gnb\"}",
+          "legendFormat": "{{gnb}} modifica\u00e7\u00e3o"
+        },
+        {
+          "refId": "C",
+          "expr": "ocudu_cu_e1ap_ctx_releases_total{gnb=~\"$gnb\"}",
+          "legendFormat": "{{gnb}} release"
+        }
+      ]
+    },
+    {
+      "id": 35,
+      "type": "timeseries",
+      "title": "Rein\u00edcios dos containers",
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 40
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ocudu_container_restarts{gnb=~\"$gnb\"}",
+          "legendFormat": "{{gnb}} {{component}}"
+        }
+      ]
+    },
+    {
+      "id": 103,
+      "type": "row",
+      "title": "DU (MAC / RLC / UEs)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 46
+      }
+    },
+    {
+      "id": 40,
+      "type": "table",
+      "title": "UEs conectados ao DU",
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 47
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "label_join(max by (gnb, pci, ue, rnti) (ocudu_du_ue_dl_bitrate_bps{gnb=~\"$gnb\"}), \"gnb_ue\", \"/\", \"gnb\", \"rnti\")",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "B",
+          "expr": "label_join(max by (gnb, pci, ue, rnti) (ocudu_du_ue_ul_bitrate_bps{gnb=~\"$gnb\"}), \"gnb_ue\", \"/\", \"gnb\", \"rnti\")",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "C",
+          "expr": "label_join(max by (gnb, pci, ue, rnti) (ocudu_du_ue_cqi{gnb=~\"$gnb\"}), \"gnb_ue\", \"/\", \"gnb\", \"rnti\")",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "D",
+          "expr": "label_join(max by (gnb, pci, ue, rnti) (ocudu_du_ue_pusch_snr_db{gnb=~\"$gnb\"}), \"gnb_ue\", \"/\", \"gnb\", \"rnti\")",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "gnb_ue",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "gnb_ue": true,
+              "gnb 2": true,
+              "gnb 3": true,
+              "gnb 4": true,
+              "pci 2": true,
+              "pci 3": true,
+              "pci 4": true,
+              "ue 2": true,
+              "ue 3": true,
+              "ue 4": true,
+              "rnti 2": true,
+              "rnti 3": true,
+              "rnti 4": true
+            },
+            "renameByName": {
+              "gnb 1": "gnb",
+              "pci 1": "pci",
+              "ue 1": "ue",
+              "rnti 1": "rnti",
+              "Value #A": "DL bps",
+              "Value #B": "UL bps",
+              "Value #C": "CQI",
+              "Value #D": "PUSCH SNR dB"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "type": "timeseries",
+      "title": "Bitrate por UE (DU)",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 53
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ocudu_du_ue_dl_bitrate_bps{gnb=~\"$gnb\"}",
+          "legendFormat": "{{gnb}} DL ue {{ue}}"
+        },
+        {
+          "refId": "B",
+          "expr": "ocudu_du_ue_ul_bitrate_bps{gnb=~\"$gnb\"}",
+          "legendFormat": "{{gnb}} UL ue {{ue}}"
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "type": "timeseries",
+      "title": "MCS por UE",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 53
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ocudu_du_ue_dl_mcs{gnb=~\"$gnb\"}",
+          "legendFormat": "{{gnb}} DL ue {{ue}}"
+        },
+        {
+          "refId": "B",
+          "expr": "ocudu_du_ue_ul_mcs{gnb=~\"$gnb\"}",
+          "legendFormat": "{{gnb}} UL ue {{ue}}"
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "type": "timeseries",
+      "title": "SNR / CQI por UE",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 53
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ocudu_du_ue_pusch_snr_db{gnb=~\"$gnb\"}",
+          "legendFormat": "{{gnb}} PUSCH SNR ue {{ue}}"
+        },
+        {
+          "refId": "B",
+          "expr": "ocudu_du_ue_pucch_snr_db{gnb=~\"$gnb\"}",
+          "legendFormat": "{{gnb}} PUCCH SNR ue {{ue}}"
+        },
+        {
+          "refId": "C",
+          "expr": "ocudu_du_ue_cqi{gnb=~\"$gnb\"}",
+          "legendFormat": "{{gnb}} CQI ue {{ue}}"
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "type": "timeseries",
+      "title": "HARQ NOK/s",
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 61
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(ocudu_du_ue_harq_total{gnb=~\"$gnb\",result=\"nok\"}[1m])",
+          "legendFormat": "{{gnb}} {{direction}} ue {{ue}}"
+        }
+      ]
+    },
+    {
+      "id": 45,
+      "type": "timeseries",
+      "title": "Lat\u00eancia do scheduler (\u00b5s)",
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 61
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ocudu_du_cell_scheduler_latency_avg_us{gnb=~\"$gnb\"}",
+          "legendFormat": "{{gnb}} m\u00e9dia pci {{pci}}"
+        },
+        {
+          "refId": "B",
+          "expr": "ocudu_du_cell_scheduler_latency_max_us{gnb=~\"$gnb\"}",
+          "legendFormat": "{{gnb}} m\u00e1x pci {{pci}}"
+        },
+        {
+          "refId": "C",
+          "expr": "ocudu_du_mac_dl_latency_avg_us{gnb=~\"$gnb\"}",
+          "legendFormat": "{{gnb}} MAC DL pci {{pci}}"
+        }
+      ]
+    },
+    {
+      "id": 46,
+      "type": "timeseries",
+      "title": "RLC SDU bytes/s",
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 61
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(ocudu_du_rlc_sdu_bytes_total{gnb=~\"$gnb\"}[1m])",
+          "legendFormat": "{{gnb}} {{direction}} ue {{ue}} drb {{drb}}"
+        }
+      ]
+    },
+    {
+      "id": 47,
+      "type": "timeseries",
+      "title": "Erros do DU (PDCCH, HARQ atrasado, RLC)",
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 68
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(ocudu_du_cell_failed_pdcch_allocs_total{gnb=~\"$gnb\"}[1m])",
+          "legendFormat": "{{gnb}} PDCCH falhos pci {{pci}}"
+        },
+        {
+          "refId": "B",
+          "expr": "rate(ocudu_du_cell_late_harqs_total{gnb=~\"$gnb\"}[1m])",
+          "legendFormat": "{{gnb}} HARQ atrasado {{direction}}"
+        },
+        {
+          "refId": "C",
+          "expr": "rate(ocudu_du_rlc_lost_pdus_total{gnb=~\"$gnb\"}[1m])",
+          "legendFormat": "{{gnb}} RLC PDUs perdidos ue {{ue}}"
+        },
+        {
+          "refId": "D",
+          "expr": "rate(ocudu_du_rlc_dropped_sdus_total{gnb=~\"$gnb\"}[1m])",
+          "legendFormat": "{{gnb}} RLC SDUs descartados ue {{ue}}"
+        }
+      ]
+    }
+  ]
+}

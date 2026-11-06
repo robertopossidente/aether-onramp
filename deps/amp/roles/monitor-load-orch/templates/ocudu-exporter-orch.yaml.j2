@@ -1,0 +1,53 @@
+{% set exporter_hosts = groups['ocu_nodes'] | default([]) + groups['odu_nodes'] | default([]) | unique %}
+{% for host in exporter_hosts %}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ocudu-exporter-{{ host }}
+  namespace: aether-5gc
+  labels:
+    app: ocudu-exporter-orch
+    gnb: {{ host }}
+spec:
+  clusterIP: None
+  ports:
+    - name: metrics
+      port: {{ split_exporter_port }}
+      targetPort: {{ split_exporter_port }}
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: ocudu-exporter-{{ host }}
+  namespace: aether-5gc
+  labels:
+    app: ocudu-exporter-orch
+    gnb: {{ host }}
+subsets:
+  - addresses:
+      - ip: {{ hostvars[host].ansible_host | default(host) }}
+    ports:
+      - name: metrics
+        port: {{ split_exporter_port }}
+{% endfor %}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ocudu-exporter-orch
+  namespace: aether-5gc
+spec:
+  targetLabels:
+    - gnb
+  endpoints:
+    - path: /metrics
+      port: metrics
+      interval: 5s
+      scrapeTimeout: 4s
+  namespaceSelector:
+    matchNames:
+      - aether-5gc
+  selector:
+    matchLabels:
+      app: ocudu-exporter-orch

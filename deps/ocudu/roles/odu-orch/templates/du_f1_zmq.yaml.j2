@@ -1,0 +1,78 @@
+gnb_id: {{ current_du.gnb_id | default(1000) }}
+gnb_du_id: {{ current_du.gnb_du_id | default(1) }}
+
+f1ap:
+  addrs: "{{ current_du.cu_f1_addr }}"
+  bind_addrs: "{{ current_du.du_f1_bind_ip | default(hostvars[inventory_hostname].ansible_host) }}"
+
+f1u:
+  bind_port: {{ current_du.f1u_bind_port | default(current_du.f1u_port | default(2152)) }}
+  peer_port: {{ current_du.f1u_peer_port | default(current_du.f1u_port | default(2153)) }}
+  socket:
+    - bind_addr: "{{ current_du.du_f1_bind_ip | default(hostvars[inventory_hostname].ansible_host) }}"
+
+ru_sdr:
+  device_driver: zmq
+  device_args: tx_port=tcp://{{ current_du.zmq_bind_ip | default('0.0.0.0') }}:{{ current_du.zmq_port | default(2000) }},rx_port=tcp://{{ current_du.target_ue_ip | default('172.28.10.4') }}:{{ (current_du.zmq_port | default(2000)) | int + 1 }},base_srate=11.52e6
+  srate: 11.52
+  tx_gain: 0
+  rx_gain: 0
+
+cell_cfg:
+  dl_arfcn: 368500
+  band: 3
+  channel_bandwidth_MHz: {{ current_du.bandwidth_mhz | default(10) }}
+  common_scs: 15
+  plmn: "00101"
+  tac: 1
+  pci: {{ current_du.pci | default(1) }}
+  sector_id: {{ current_du.sector_id | default(current_du.gnb_du_id | default(1)) }}
+  pdcch:
+    common:
+      ss0_index: 0
+      coreset0_index: 6
+    dedicated:
+      ss2_type: common
+      dci_format_0_1_and_1_1: false
+  prach:
+    prach_config_index: 1
+  pdsch:
+    mcs_table: qam64
+  pusch:
+    mcs_table: qam64
+
+log:
+  filename: stdout
+  all_level: info
+
+metrics:
+  enable_json: true
+  layers:
+    enable_sched: true
+    enable_rlc: true
+    enable_mac: true
+  periodicity:
+    du_report_period: 1000
+
+remote_control:
+  enabled: true
+  bind_addr: 0.0.0.0
+  port: {{ current_du.du_rc_port | default(8002) }}
+
+pcap:
+  mac_enable: false
+  f1ap_enable: false
+  f1u_enable: false
+
+buffer_pool:
+  nof_segments: {{ (ocudu_orch.ran_tuning if ocudu_orch is defined and ocudu_orch.ran_tuning is defined else (ocudu.ran_tuning if ocudu is defined and ocudu.ran_tuning is defined else {})).buffer_pool_segments | default(262144) }}
+
+expert_execution:
+  threads:
+    main_pool:
+      nof_threads: {{ (ocudu_orch.ran_tuning if ocudu_orch is defined and ocudu_orch.ran_tuning is defined else (ocudu.ran_tuning if ocudu is defined and ocudu.ran_tuning is defined else {})).du_threads | default(2) }}
+      task_queue_size: {{ (ocudu_orch.ran_tuning if ocudu_orch is defined and ocudu_orch.ran_tuning is defined else (ocudu.ran_tuning if ocudu is defined and ocudu.ran_tuning is defined else {})).du_task_queue_size | default(1024) }}
+      backoff_period: {{ (ocudu_orch.ran_tuning if ocudu_orch is defined and ocudu_orch.ran_tuning is defined else (ocudu.ran_tuning if ocudu is defined and ocudu.ran_tuning is defined else {})).du_backoff_period | default(500) }}
+  queues:
+    du_ue_data_executor_queue_size: {{ (ocudu_orch.ran_tuning if ocudu_orch is defined and ocudu_orch.ran_tuning is defined else (ocudu.ran_tuning if ocudu is defined and ocudu.ran_tuning is defined else {})).du_queue_size | default(1024) }}
+

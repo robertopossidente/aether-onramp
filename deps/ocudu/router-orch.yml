@@ -1,0 +1,92 @@
+---
+
+- name: provision router and network settings for orchestrated nodes
+  hosts: orch_nodes
+  gather_facts: true
+
+  vars_files:
+    - "vars/main.yml"
+
+  environment: "{{ proxy_env }}"
+
+  tasks:
+    - name: set net.ipv4.conf.all.arp_filter to 1
+      ansible.posix.sysctl:
+        name: net.ipv4.conf.all.arp_filter
+        value: '1'
+        sysctl_set: true
+        reload: true
+      become: true
+      tags: [install]
+
+    - name: set net.ipv4.conf.all.arp_ignore to 1
+      ansible.posix.sysctl:
+        name: net.ipv4.conf.all.arp_ignore
+        value: '1'
+        sysctl_set: true
+        reload: true
+      become: true
+      tags: [install]
+
+    - name: set net.ipv4.conf.all.arp_announce to 2
+      ansible.posix.sysctl:
+        name: net.ipv4.conf.all.arp_announce
+        value: '2'
+        sysctl_set: true
+        reload: true
+      become: true
+      tags: [install]
+
+    - name: set net.ipv4.conf.all.rp_filter to 2
+      ansible.posix.sysctl:
+        name: net.ipv4.conf.all.rp_filter
+        value: '2'
+        sysctl_set: true
+        reload: true
+      become: true
+      tags: [install]
+
+    - name: set net.core.wmem_max to 24912805
+      ansible.posix.sysctl:
+        name: net.core.wmem_max
+        value: '24912805'
+        sysctl_set: true
+        reload: true
+      become: true
+      tags: [install]
+
+    - name: set net.core.rmem_max to 24912805
+      ansible.posix.sysctl:
+        name: net.core.rmem_max
+        value: '24912805'
+        sysctl_set: true
+        reload: true
+      become: true
+      tags: [install]
+
+    - name: configure static route for upf traffic on orchestrated node
+      command:
+        argv:
+          - ip
+          - route
+          - add
+          - "{{ core.upf.access_subnet | ansible.utils.ipaddr('network/prefix') }}"
+          - via
+          - "{{ (ocudu_orch.node_containers.network.gateway if (ocudu_orch is defined and ocudu_orch.node_containers is defined) else ocudu.node_containers.network.gateway) if ((ocudu_orch.node_containers.enabled | default(false) | bool) or (ocudu.node_containers.enabled | default(false) | bool)) else core.amf.ip }}"
+      when: (inventory_hostname not in groups['master_nodes']) and (core.upf.multihop_gnb | default(false) == false)
+      become: true
+      ignore_errors: true
+      tags: [install]
+
+    - name: remove static route for upf traffic on orchestrated node
+      command:
+        argv:
+          - ip
+          - route
+          - del
+          - "{{ core.upf.access_subnet | ansible.utils.ipaddr('network/prefix') }}"
+      when: (inventory_hostname not in groups['master_nodes']) and (core.upf.multihop_gnb | default(false) == false)
+      become: true
+      ignore_errors: true
+      tags: [uninstall]
+
